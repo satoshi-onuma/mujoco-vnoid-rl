@@ -402,7 +402,7 @@ void Bvh::Visualize(Visualizer* viz, VizInfo& info){
     ii = 0;
     for(auto n : nodes){
 	    viz->data->GetLineVertices(info.iframe, info.ilines)[iv+0] = n->pos.cast<float>();
-        viz->data->GetLineVertices(info.iframe, info.ilines)[iv+1] = (n->pos + scale*(n->ori*Vector3d::UnitX())).cast<float>();
+        viz->data->GetLineVertices(info.iframe, info.ilines)[iv+1] = (n->pos + scale*(n->ori*Vector3::UnitX())).cast<float>();
         viz->data->GetLineIndices (info.iframe, info.ilines)[ii+0] = iv+0;
         viz->data->GetLineIndices (info.iframe, info.ilines)[ii+1] = iv+1;
         iv += 2;
@@ -421,7 +421,7 @@ void Bvh::Visualize(Visualizer* viz, VizInfo& info){
     ii = 0;
     for(auto n : nodes){
 	    viz->data->GetLineVertices(info.iframe, info.ilines)[iv+0] = n->pos.cast<float>();
-        viz->data->GetLineVertices(info.iframe, info.ilines)[iv+1] = (n->pos + scale*(n->ori*Vector3d::UnitY())).cast<float>();
+        viz->data->GetLineVertices(info.iframe, info.ilines)[iv+1] = (n->pos + scale*(n->ori*Vector3::UnitY())).cast<float>();
         viz->data->GetLineIndices (info.iframe, info.ilines)[ii+0] = iv+0;
         viz->data->GetLineIndices (info.iframe, info.ilines)[ii+1] = iv+1;
         iv += 2;
@@ -440,7 +440,7 @@ void Bvh::Visualize(Visualizer* viz, VizInfo& info){
     ii = 0;
     for(auto n : nodes){
 	    viz->data->GetLineVertices(info.iframe, info.ilines)[iv+0] = n->pos.cast<float>();
-        viz->data->GetLineVertices(info.iframe, info.ilines)[iv+1] = (n->pos + scale*(n->ori*Vector3d::UnitZ())).cast<float>();
+        viz->data->GetLineVertices(info.iframe, info.ilines)[iv+1] = (n->pos + scale*(n->ori*Vector3::UnitZ())).cast<float>();
         viz->data->GetLineIndices (info.iframe, info.ilines)[ii+0] = iv+0;
         viz->data->GetLineIndices (info.iframe, info.ilines)[ii+1] = iv+1;
         iv += 2;

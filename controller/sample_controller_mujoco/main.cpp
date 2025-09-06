@@ -146,7 +146,8 @@ int main(int argc, const char** argv) {
         //  Otherwise add a cpu timer and exit this loop when it is time to render.
         mjtNum simstart = d->time;
         while (d->time - simstart < 1.0/60.0) {
-            robot->Control();
+        	RLParams dummy_params;
+            robot->Control(dummy_params);
             mj_step(m, d);
         }
 

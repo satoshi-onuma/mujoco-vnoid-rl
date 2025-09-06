@@ -7,5 +7,7 @@ endif()
 
 if(VNOID_BUILD_MUJOCO)
 	add_subdirectory(sample_controller_mujoco)
+	add_subdirectory(vnoid_rl_env)
 endif()
+
 

@@ -47,6 +47,7 @@ if(VNOID_BUILD_CNOID)
 	choreonoid_add_body_handler(SwingBridgeHandler SwingBridgeHandler.cpp)
 else()
 	add_library(vnoid_lib STATIC ${VNOID_HEADERS} ${VNOID_SOURCES})
+	set_target_properties(vnoid_lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
 	install(TARGETS vnoid_lib
 		EXPORT        vnoidExport
 		LIBRARY       DESTINATION lib
