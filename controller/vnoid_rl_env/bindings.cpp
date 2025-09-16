@@ -1,137 +1,235 @@
 #include <pybind11/pybind11.h>
-#include <pybind11/numpy.h>   // PythonのNumpy配列を扱うために必要
-#include <pybind11/stl.h>     // C++の標準ライブラリ(vectorなど)を扱うために必要
+#include <pybind11/numpy.h>
+#include <pybind11/stl.h>
 #include "myrobot.h"
-#include <GLFW/glfw3.h> // ★ GLFWを追加
-#include <mujoco/mujoco.h> // mjv/mjr関連の定義のために必要
-#include <mutex> // ★ mutexを追加
+#include <GLFW/glfw3.h>
+#include <mujoco/mujoco.h>
+#include <mutex>
+#include <memory>
+#include <stdexcept>
 
 namespace py = pybind11;
 using namespace cnoid::vnoid;
 
-
-// ★★★ GLFWの初期化を管理するための静的カウンタとミューテックスを追加 ★★★
-static int g_glfw_init_count = 0;
+// ★★★ GLFW管理のスレッドセーフティを強化 ★★★
 static std::mutex g_glfw_mutex;
+static int g_glfw_init_count = 0;
+static bool g_glfw_initialized = false;
 
 // C++側のGym環境を管理するクラス
 class VnoidEnv {
-public:
+private:
     // MuJoCoのデータ
-    mjModel* m = NULL;
-    mjData* d = NULL;
+    mjModel* m = nullptr;
+    mjData* d = nullptr;
+    
     // vnoidのロボットクラス
-    MyRobot robot;
+    std::unique_ptr<MyRobot> robot;
     double previous_x = 0.0;
 
-    // ★★★ レンダリング用のオブジェクトを追加 ★★★
+    // レンダリング用のオブジェクト
     mjvCamera cam;
     mjvOption opt;
     mjvScene scn;
     mjrContext con;
-    // ビューポート（画像の解像度）
     mjrRect viewport;
     GLFWwindow* window = nullptr;
+    
+    // 初期化状態を追跡
+    bool initialized = false;
+    bool scene_initialized = false;
+    bool context_initialized = false;
 
-    // コンストラクタ：Pythonからモデルファイルのパスを受け取って初期化
+public:
+    int frame_skip;
+
+    // コンストラクタ
     VnoidEnv(const std::string& model_path) {
-       // ★ スレッドセーフなGLFW初期化処理
-        std::lock_guard<std::mutex> lock(g_glfw_mutex);
-        if (g_glfw_init_count++ == 0) {
-            if (!glfwInit()) {
-                throw std::runtime_error("GLFWの初期化に失敗しました。");
-            }
+        try {
+            initializeGLFW();
+            loadModel(model_path);
+            initializeRobot();
+            initializeRenderer();
+            initialized = true;
+            const double video_fps = 30.0;
+            this->frame_skip = (1.0 / video_fps) / m->opt.timestep;
+            printf("DEBUG INFO: Frame skip set to %d\n", this->frame_skip);
+        } catch (...) {
+            cleanup();
+            throw;
         }
-        
-        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-        window = glfwCreateWindow(640, 480, "Headless MuJoCo", NULL, NULL);
-        if (!window) {
-            // glfwInitが成功したのにウィンドウ作成が失敗した場合のクリーンアップ
-            if (--g_glfw_init_count == 0) {
-                glfwTerminate();
-            }
-            throw std::runtime_error("GLFWウィンドウの作成に失敗しました。");
-        }
-        glfwMakeContextCurrent(window);
-        
-        char error[1000];
-        m = mj_loadXML(model_path.c_str(), 0, error, 1000);
-        if (!m) {
-
-            // 例外を投げる前にリソースを解放
-            glfwDestroyWindow(window);
-            if (--g_glfw_init_count == 0) {
-                glfwTerminate();
-            }
-            throw std::runtime_error("モデルファイルの読み込みに失敗しました: " + std::string(error));
-        }
-        d = mj_makeData(m);
-        robot.Init(m, d);
-
-        // ★★★ レンダリング関連の初期化を追加 ★★★
-        mjv_defaultCamera(&cam);
-        mjv_defaultOption(&opt);
-        mjr_defaultContext(&con);
-        mjv_makeScene(m, &scn, 2000);
-        mjr_makeContext(m, &con, mjFONTSCALE_150);
-
-        // 録画する画像の解像度を設定 (例: 640x480)
-        viewport = {0, 0, 640, 480};
-
-        // ★★★ この行を追加して、nqとnvの値を確認する ★★★
-        printf("DEBUG INFO: nq = %d, nv = %d, Total Obs Size = %d\n", m->nq, m->nv, m->nq + m->nv);
     }
 
-    // デストラクタ：MuJoCoのデータを解放
+    // デストラクタ
     ~VnoidEnv() {
-        // ★★★ レンダリング関連の解放処理を追加 ★★★
-        mjv_freeScene(&scn);
-        mjr_freeContext(&con);
-        
-        if (d) mj_deleteData(d);
-        if (m) mj_deleteModel(m);
-
-       // ★ スレッドセーフなGLFW終了処理
-        std::lock_guard<std::mutex> lock(g_glfw_mutex);
-        if (window) {
-            glfwDestroyWindow(window);
-        }
-        if (--g_glfw_init_count == 0) {
-            glfwTerminate();
-        }
+        cleanup();
     }
 
-    // ★★★ 以下の4行を追加して、コピーとムーブを禁止する ★★★
+    // コピー・ムーブを禁止
     VnoidEnv(const VnoidEnv&) = delete;
     VnoidEnv& operator=(const VnoidEnv&) = delete;
     VnoidEnv(VnoidEnv&&) = delete;
     VnoidEnv& operator=(VnoidEnv&&) = delete;
 
-    // reset関数にもprevious_xの初期化を追加
+private:
+    void initializeGLFW() {
+        std::lock_guard<std::mutex> lock(g_glfw_mutex);
+        
+        if (!g_glfw_initialized) {
+            if (!glfwInit()) {
+                throw std::runtime_error("GLFWの初期化に失敗しました。");
+            }
+            g_glfw_initialized = true;
+        }
+        g_glfw_init_count++;
+        
+        // 不可視ウィンドウを作成
+        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
+        glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE);
+        window = glfwCreateWindow(1280, 720, "Headless MuJoCo", nullptr, nullptr);
+        
+        if (!window) {
+            if (--g_glfw_init_count == 0 && g_glfw_initialized) {
+                glfwTerminate();
+                g_glfw_initialized = false;
+            }
+            throw std::runtime_error("GLFWウィンドウの作成に失敗しました。");
+        }
+        
+        glfwMakeContextCurrent(window);
+    }
+
+    void loadModel(const std::string& model_path) {
+        char error[1000] = {0};
+        m = mj_loadXML(model_path.c_str(), nullptr, error, 1000);
+        
+        if (!m) {
+            throw std::runtime_error("モデルファイルの読み込みに失敗しました: " + std::string(error));
+        }
+        
+        d = mj_makeData(m);
+        if (!d) {
+            throw std::runtime_error("MuJoCoデータの作成に失敗しました。");
+        }
+        
+        printf("DEBUG INFO: nq = %d, nv = %d, Total Obs Size = %d\n", m->nq, m->nv, m->nq + m->nv);
+    }
+
+    void initializeRobot() {
+        robot = std::make_unique<MyRobot>();
+        robot->Init(m, d);
+    }
+
+    void initializeRenderer() {
+        // カメラとオプションの初期化
+        mjv_defaultCamera(&cam);
+        mjv_defaultOption(&opt);
+
+        // ★★★ カメラ位置をロボット中心に調整 ★★★
+        // ロボットを追跡するカメラ設定
+        cam.type = mjCAMERA_TRACKING;  // 追跡カメラモード
+        cam.trackbodyid = 0;           // 胴体（通常はindex 0）を追跡
+        cam.distance = 3.0;            // ロボットからの距離（メートル）
+        cam.elevation = -20;           // 仰角（度）- 少し上から見下ろす
+        cam.azimuth = 45;              // 方位角（度）- 斜め前から
+        
+        // または固定カメラの場合：
+        // cam.type = mjCAMERA_FREE;
+        // cam.lookat[0] = 0.0;  // ロボットの位置を見る（X座標）
+        // cam.lookat[1] = 0.0;  // Y座標
+        // cam.lookat[2] = 1.0;  // Z座標（ロボットの腰あたりの高さ）
+        
+        // シーンの初期化
+        memset(&scn, 0, sizeof(mjvScene));
+        mjv_makeScene(m, &scn, 2000);
+        scene_initialized = true;
+        
+        // レンダリングコンテキストの初期化
+        memset(&con, 0, sizeof(mjrContext));
+        mjr_makeContext(m, &con, mjFONTSCALE_150);
+        context_initialized = true;
+        
+        // ★★★ ビューポートのサイズを大きくして高画質化 ★★★
+        viewport = {0, 0, 1280, 720};  // HD解像度に変更
+    }
+
+    void cleanup() {
+        // レンダリング関連のクリーンアップ
+        if (scene_initialized) {
+            mjv_freeScene(&scn);
+            scene_initialized = false;
+        }
+        
+        if (context_initialized) {
+            mjr_freeContext(&con);
+            context_initialized = false;
+        }
+        
+        // MuJoCoデータのクリーンアップ
+        if (d) {
+            mj_deleteData(d);
+            d = nullptr;
+        }
+        
+        if (m) {
+            mj_deleteModel(m);
+            m = nullptr;
+        }
+        
+        // ロボットのクリーンアップ
+        robot.reset();
+        
+        // GLFWのクリーンアップ
+        std::lock_guard<std::mutex> lock(g_glfw_mutex);
+        if (window) {
+            glfwDestroyWindow(window);
+            window = nullptr;
+        }
+        
+        if (--g_glfw_init_count == 0 && g_glfw_initialized) {
+            glfwTerminate();
+            g_glfw_initialized = false;
+        }
+    }
+
+public:
     py::array_t<double> reset() {
+        if (!initialized) {
+            throw std::runtime_error("環境が初期化されていません。");
+        }
+        
         mj_resetData(m, d);
         mj_forward(m, d);
-        previous_x = d->qpos[0]; // ★リセット時のx座標を保存
+
+         // 2. vnoidの内部状態を完全にリセット
+        robot->ResetState();  // ← 新しく追加する関数
+
+        previous_x = d->qpos[0];
         return get_observation();
     }
 
-    // Pythonのenv.step()に対応する関数
     py::tuple step(py::array_t<double> action) {
-        // 1. Python(Numpy)からのactionをC++のRLParamsに変換
+        if (!initialized) {
+            throw std::runtime_error("環境が初期化されていません。");
+        }
+        
         auto buf = action.request();
         if (buf.ndim != 1 || buf.size < 2) {
             throw std::runtime_error("アクションの次元またはサイズが不正です。");
         }
+        
         double* ptr = static_cast<double*>(buf.ptr);
         RLParams rl_params;
         rl_params.foot_offset.x() = ptr[0];
         rl_params.foot_offset.y() = ptr[1];
 
-        // 2. vnoidの制御サイクルとMuJoCoのシミュレーションを実行
-        robot.Control(rl_params);
-        mj_step(m, d);
+        // vnoidの制御サイクルとMuJoCoのシミュレーション
+        // ★★★ フレームスキップを実装 ★★★
+        for (int i = 0; i < this->frame_skip; ++i) {
+            robot->Control(rl_params);
+            mj_step(m, d);
+        }
 
-        // 3. 結果をPythonのタプル(obs, reward, terminated, info)で返す
         py::array_t<double> obs = get_observation();
         double reward = compute_reward();
         bool terminated = check_termination();
@@ -139,85 +237,75 @@ public:
         return py::make_tuple(obs, reward, terminated, py::dict());
     }
 
-     // ★★★ render関数を実装 ★★★
     py::array_t<unsigned char> render() {
-        // 1. シーンデータを更新
-        mjv_updateScene(m, d, &opt, NULL, &cam, mjCAT_ALL, &scn);
-
-        // 2. シーンを描画バッファにレンダリング
-        mjr_render(viewport, &scn, &con);
-
-        // 3. 描画バッファからピクセルデータを読み出す
-        auto buffer = new unsigned char[viewport.width * viewport.height * 3];
-        mjr_readPixels(buffer, NULL, viewport, &con);
-
-        // 4. pybind11でPython(Numpy)配列に変換して返す
-        //    (Python側でメモリを管理するように設定)
-        py::capsule free_when_done(buffer, [](void *f) {
-            delete[] static_cast<unsigned char *>(f);
-        });
+        if (!initialized || !scene_initialized || !context_initialized) {
+            throw std::runtime_error("レンダリング環境が初期化されていません。");
+        }
         
-        return py::array_t<unsigned char>(
-            {viewport.height, viewport.width, 3}, // shape (高さ, 幅, 3ch)
-            {viewport.width * 3, 3, 1},            // strides
-            buffer,                                // buffer pointer
-            free_when_done);
-    }
+        try {
 
-     
+            for (int i = 0; i < 3; ++i) {
+            cam.lookat[i] = d->qpos[i];
+        }
+            // シーンデータを更新
+            mjv_updateScene(m, d, &opt, nullptr, &cam, mjCAT_ALL, &scn);
+            
+            // シーンを描画バッファにレンダリング
+            mjr_render(viewport, &scn, &con);
+            
+            // ピクセルデータを読み出し
+            size_t buffer_size = viewport.width * viewport.height * 3;
+            auto buffer = std::make_unique<unsigned char[]>(buffer_size);
+            mjr_readPixels(buffer.get(), nullptr, viewport, &con);
+            
+            // Python配列に変換（スマートポインタを使用してメモリ安全性を確保）
+            py::capsule free_when_done(buffer.release(), [](void *f) {
+                delete[] static_cast<unsigned char *>(f);
+            });
+            
+            return py::array_t<unsigned char>(
+                {viewport.height, viewport.width, 3},
+                {viewport.width * 3, 3, 1},
+                static_cast<unsigned char*>(free_when_done.get_pointer()),
+                free_when_done
+            );
+        } catch (const std::exception& e) {
+            throw std::runtime_error("レンダリング中にエラーが発生しました: " + std::string(e.what()));
+        }
+    }
 
 private:
-    // ★★★これらの中身は後で実装します★★★
-    // 観測データを取得してNumpy配列で返す
     py::array_t<double> get_observation() {
-    // 観測データの次元数 (qposとqvelの合計)
-    const int obs_size = m->nq + m->nv;
-    py::array_t<double> obs(obs_size);
-    auto obs_ptr = obs.mutable_data();
+        const int obs_size = m->nq + m->nv;
+        py::array_t<double> obs(obs_size);
+        auto obs_ptr = obs.mutable_data();
 
-    // d->qpos と d->qvel から観測データをコピーする
-    memcpy(obs_ptr, d->qpos, m->nq * sizeof(double));
-    memcpy(obs_ptr + m->nq, d->qvel, m->nv * sizeof(double));
+        memcpy(obs_ptr, d->qpos, m->nq * sizeof(double));
+        memcpy(obs_ptr + m->nq, d->qvel, m->nv * sizeof(double));
 
-    return obs;
+        return obs;
     }
 
-    // 報酬を計算する
     double compute_reward() {
-        // 現在のx座標と前のステップのx座標の差分（前進速度）
         double current_x = d->qpos[0];
         double forward_reward = current_x - previous_x;
-
-        // 現在のx座標を次のステップのために保存
         previous_x = current_x;
-
-        // TODO: 生存ボーナスなどを追加しても良い
-        double healthy_reward = 1.0; 
-
-        return forward_reward * 5.0 + healthy_reward; // 前進の重みを5倍に
+        
+        double healthy_reward = 1.0;
+        return forward_reward * 5.0 + healthy_reward;
     }
 
-    
-
-    // 終了判定を行う
     bool check_termination() {
-        // 胴体のz座標を取得
         double hips_z_position = d->qpos[2];
-
-        // HIPSの高さが0.5m未満になったら転倒とみなす
-        bool is_terminated = (hips_z_position < 0.5);
-
-        return is_terminated;
+        return (hips_z_position < 0.5);
     }
-
-   
 };
 
-// pybind11の魔法：VnoidEnvクラスを "vnoid_rl_env" という名前でPythonに公開
+// pybind11モジュール定義
 PYBIND11_MODULE(vnoid_rl_env, m) {
     py::class_<VnoidEnv>(m, "VnoidEnv")
-        .def(py::init<const std::string&>()) // コンストラクタを公開
-        .def("step", &VnoidEnv::step)         // stepメソッドを公開
-        .def("reset", &VnoidEnv::reset)     // resetメソッドを公開
-        .def("render", &VnoidEnv::render); // ★ renderメソッドを公開
+        .def(py::init<const std::string&>())
+        .def("step", &VnoidEnv::step)
+        .def("reset", &VnoidEnv::reset)
+        .def("render", &VnoidEnv::render);
 }

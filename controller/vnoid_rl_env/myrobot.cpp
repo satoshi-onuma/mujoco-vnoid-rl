@@ -155,6 +155,60 @@ void MyRobot::Init(mjModel* _m, mjData* _d){
     
 }
 
+// myrobot.cpp
+void MyRobot::ResetState() {
+    // タイマーをリセット
+    timer.count = 0;
+    timer.control_count = 0;
+    timer.time = 0.0;
+    
+    // フットステップをクリア・再初期化
+    footstep.steps.clear();
+    footstep_buffer.steps.clear();
+    
+    // 初期フットステップを再設定
+    footstep.steps.push_back(Step(0.0, 0.0, 0.2, 0.0, 0.0, 0.5, 0));
+    footstep.steps.push_back(Step(0.0, 0.0, 0.2, 0.0, 0.0, 0.5, 1));
+    footstep.steps[0].foot_pos[0] = foot[0].pos_ref;
+    footstep.steps[0].foot_pos[1] = foot[1].pos_ref;
+    footstep.steps[0].foot_angle[0] = foot[0].angle_ref;   // ← 追加！
+    footstep.steps[0].foot_angle[1] = foot[1].angle_ref;   // ← 追加！
+    footstep.steps[0].foot_ori[0] = foot[0].ori_ref;       // ← 追加！
+    footstep.steps[0].foot_ori[1] = foot[1].ori_ref;       // ← 追加！
+    footstep.steps[0].dcm = centroid.dcm_ref;
+    
+    footstep_planner.Plan(param, footstep);
+    footstep_planner.GenerateDCM(param, footstep);
+    
+    footstep_buffer.steps.push_back(footstep.steps[0]);
+    footstep_buffer.steps.push_back(footstep.steps[1]);
+    
+    // ステッピングコントローラをリセット
+    stepping_controller.buffer_ready = false;
+    stepping_controller.time_to_landing = 0.0;
+    
+    // 重心・ベース状態を初期値に戻す
+    base.ori_ref = Quaternion(1.0, 0.0, 0.0, 0.0);
+    base.angle_ref = Vector3(0.0, 0.0, 0.0);
+    centroid.com_pos_ref = Vector3(0.0, 0.0, param.com_height);
+    centroid.com_vel_ref = Vector3(0.0, 0.0, 0.0);
+    centroid.com_acc_ref = Vector3(0.0, 0.0, 0.0);
+    centroid.zmp_ref = Vector3(0.0, 0.0, 0.0);
+    centroid.zmp_target = Vector3(0.0, 0.0, 0.0);
+    centroid.dcm_ref = Vector3(0.0, 0.0, param.com_height);
+    centroid.dcm_target = Vector3(0.0, 0.0, param.com_height);
+    
+    // 足の初期状態をリセット
+    foot[0].pos_ref = Vector3(0.02, -0.10, 0.0);
+    foot[1].pos_ref = Vector3(0.02,  0.10, 0.0);
+    foot[0].angle_ref = Vector3(0.0, 0.0, 0.0);        // ← 追加！
+    foot[1].angle_ref = Vector3(0.0, 0.0, 0.0);        // ← 追加！
+    foot[0].ori_ref = Quaternion(1.0, 0.0, 0.0, 0.0);  // ← 追加！
+    foot[1].ori_ref = Quaternion(1.0, 0.0, 0.0, 0.0);  // ← 追加！
+    foot[0].contact_ref = true;
+    foot[1].contact_ref = true;
+}
+
 void MyRobot::Control(const RLParams& rl_params){ // ★引数を追加
     if(timer.count % param.control_cycle == 0){    
         RobotMujoco::Sense(timer, base, foot, joint);

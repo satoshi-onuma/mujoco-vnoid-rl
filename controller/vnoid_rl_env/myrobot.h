@@ -41,6 +41,7 @@ public:
 	
 	virtual void Init(mjModel* _m, mjData* _d);
 	virtual void Control(const RLParams& rl_params); // ★引数を追加
+    void ResetState(); 
 	
 	MyRobot();
 
