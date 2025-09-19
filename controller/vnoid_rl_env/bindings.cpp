@@ -194,19 +194,63 @@ private:
 
 public:
     py::array_t<double> reset() {
-        if (!initialized) {
-            throw std::runtime_error("環境が初期化されていません。");
-        }
-        
-        mj_resetData(m, d);
-        mj_forward(m, d);
-
-         // 2. vnoidの内部状態を完全にリセット
-        robot->ResetState();  // ← 新しく追加する関数
-
-        previous_x = d->qpos[0];
-        return get_observation();
+    if (!initialized) {
+        throw std::runtime_error("環境が初期化されていません。");
     }
+    
+    printf("DEBUG: Reset開始\n");
+    
+    // 1. MuJoCoの物理状態を完全にリセット
+    mj_resetData(m, d);
+
+    double com_height = 0.8;  // デフォルト値
+    
+    // 2. ロボットの初期姿勢を明示的に設定（MuJoCoのqpos配列を直接操作）
+    // ベース位置 (floating base: x, y, z, qw, qx, qy, qz)
+    d->qpos[0] = 0.0;  // x位置
+    d->qpos[1] = 0.0;  // y位置  
+    d->qpos[2] = com_height;  // z位置（重心高さ）
+    d->qpos[3] = 1.0;  // qw (クォータニオンw成分)
+    d->qpos[4] = 0.0;  // qx
+    d->qpos[5] = 0.0;  // qy
+    d->qpos[6] = 0.0;  // qz
+    
+    // 関節角度をすべて0にリセット（7番目以降が関節角度）
+    for (int i = 7; i < m->nq; ++i) {
+        d->qpos[i] = 0.0;
+    }
+    
+    // 速度もすべて0にリセット
+    for (int i = 0; i < m->nv; ++i) {
+        d->qvel[i] = 0.0;
+    }
+    
+    // 加速度も0にリセット
+    for (int i = 0; i < m->nv; ++i) {
+        d->qacc[i] = 0.0;
+    }
+    
+    // 制御入力も0にリセット
+    for (int i = 0; i < m->nu; ++i) {
+        d->ctrl[i] = 0.0;
+    }
+    
+    // 3. MuJoCoの順運動学を実行して、位置・速度・力を更新
+    mj_forward(m, d);
+    
+    // 4. vnoidの内部状態を完全にリセット
+    robot->ResetState();
+    
+    // 5. 追跡用変数もリセット
+    previous_x = d->qpos[0];
+    
+    printf("DEBUG: Reset完了 - MuJoCo状態とVnoid状態がリセットされました\n");
+    printf("DEBUG: 初期位置 = (%.3f, %.3f, %.3f)\n", d->qpos[0], d->qpos[1], d->qpos[2]);
+    printf("DEBUG: 初期クォータニオン = (%.3f, %.3f, %.3f, %.3f)\n", 
+           d->qpos[3], d->qpos[4], d->qpos[5], d->qpos[6]);
+    
+    return get_observation();
+}
 
     py::tuple step(py::array_t<double> action) {
         if (!initialized) {

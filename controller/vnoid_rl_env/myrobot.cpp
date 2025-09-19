@@ -4,6 +4,7 @@ using namespace std;
 
 namespace cnoid{
 namespace vnoid{
+    
 
 MyRobot::MyRobot(){
     base_actuation = false;
@@ -176,6 +177,14 @@ void MyRobot::ResetState() {
     footstep.steps[0].foot_ori[0] = foot[0].ori_ref;       // ← 追加！
     footstep.steps[0].foot_ori[1] = foot[1].ori_ref;       // ← 追加！
     footstep.steps[0].dcm = centroid.dcm_ref;
+
+    footstep.steps[1].foot_pos[0] = foot[0].pos_ref;
+    footstep.steps[1].foot_pos[1] = foot[1].pos_ref;
+    footstep.steps[1].foot_angle[0] = foot[0].angle_ref;   // 2番目のステップも同様
+    footstep.steps[1].foot_angle[1] = foot[1].angle_ref;
+    footstep.steps[1].foot_ori[0] = foot[0].ori_ref;
+    footstep.steps[1].foot_ori[1] = foot[1].ori_ref;
+    footstep.steps[1].dcm = centroid.dcm_ref;
     
     footstep_planner.Plan(param, footstep);
     footstep_planner.GenerateDCM(param, footstep);
@@ -186,10 +195,15 @@ void MyRobot::ResetState() {
     // ステッピングコントローラをリセット
     stepping_controller.buffer_ready = false;
     stepping_controller.time_to_landing = 0.0;
+    stepping_controller.swing_height = 0.05;     // デフォルト値を再設定
+    stepping_controller.swing_tilt = 0.0;        // スイング時の傾きを0に
+    stepping_controller.dsp_duration = 0.05;     // 両足支持期間を再設定
     
     // 重心・ベース状態を初期値に戻す
     base.ori_ref = Quaternion(1.0, 0.0, 0.0, 0.0);
     base.angle_ref = Vector3(0.0, 0.0, 0.0);
+    base.pos_ref = Vector3(0.0, 0.0, 0.0);  // ベース位置も初期化
+    base.vel_ref = Vector3(0.0, 0.0, 0.0);  // ベース速度も初期化
     centroid.com_pos_ref = Vector3(0.0, 0.0, param.com_height);
     centroid.com_vel_ref = Vector3(0.0, 0.0, 0.0);
     centroid.com_acc_ref = Vector3(0.0, 0.0, 0.0);
@@ -205,8 +219,23 @@ void MyRobot::ResetState() {
     foot[1].angle_ref = Vector3(0.0, 0.0, 0.0);        // ← 追加！
     foot[0].ori_ref = Quaternion(1.0, 0.0, 0.0, 0.0);  // ← 追加！
     foot[1].ori_ref = Quaternion(1.0, 0.0, 0.0, 0.0);  // ← 追加！
+    foot[0].vel_ref = Vector3(0.0, 0.0, 0.0);        // 足の速度を0に
+    foot[1].vel_ref = Vector3(0.0, 0.0, 0.0);        // 足の速度を0に
     foot[0].contact_ref = true;
     foot[1].contact_ref = true;
+
+    // 手の初期状態もリセット（必要に応じて）
+    hand[0].pos_ref = Vector3(0.0, -0.25, -0.1);
+    hand[1].pos_ref = Vector3(0.0,  0.25, -0.1);
+    hand[0].ori_ref = Quaternion(1.0, 0.0, 0.0, 0.0);
+    hand[1].ori_ref = Quaternion(1.0, 0.0, 0.0, 0.0);
+
+    // 関節の目標値も初期位置にリセット（必要に応じて）
+    for (int i = 0; i < joint.size(); ++i) {
+        joint[i].q_ref = 0.0;      // 関節角度を0に
+        joint[i].dq_ref = 0.0;     // 関節角速度を0に
+        joint[i].u_ref = 0.0;      // トルク指令を0に
+    }
 }
 
 void MyRobot::Control(const RLParams& rl_params){ // ★引数を追加
