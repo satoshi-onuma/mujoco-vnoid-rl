@@ -1,2 +1,0 @@
-/usr/bin/ar qc libvnoid_lib.a CMakeFiles/vnoid_lib.dir/bvh.o CMakeFiles/vnoid_lib.dir/fksolver.o CMakeFiles/vnoid_lib.dir/iksolver.o CMakeFiles/vnoid_lib.dir/filter.o CMakeFiles/vnoid_lib.dir/footstep.o CMakeFiles/vnoid_lib.dir/footstep_planner.o CMakeFiles/vnoid_lib.dir/ground_estimator.o CMakeFiles/vnoid_lib.dir/robot_base.o CMakeFiles/vnoid_lib.dir/rollpitchyaw.o CMakeFiles/vnoid_lib.dir/stabilizer.o CMakeFiles/vnoid_lib.dir/stepping_controller.o CMakeFiles/vnoid_lib.dir/robot_mujoco.o
-/usr/bin/ranlib libvnoid_lib.a

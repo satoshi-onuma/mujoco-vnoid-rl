@@ -1,1 +1,0 @@
-/usr/bin/c++ -fPIC -shared  -o vnoid_rl_env.so CMakeFiles/vnoid_rl_env.dir/bindings.cpp.o CMakeFiles/vnoid_rl_env.dir/myrobot.cpp.o  -Wl,-rpath,/home/onuma-satoshi/mujoco-install/lib ../../src/libvnoid_lib.a /home/onuma-satoshi/mujoco-install/lib/libmujoco.so.3.3.5 /usr/lib/x86_64-linux-gnu/libglfw.so.3.3 /home/onuma-satoshi/mujoco-install/lib/libmujoco.so.3.3.5 
