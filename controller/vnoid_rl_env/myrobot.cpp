@@ -162,6 +162,14 @@ void MyRobot::ResetState() {
     timer.count = 0;
     timer.control_count = 0;
     timer.time = 0.0;
+
+   
+    for (int i = 0; i < 2; i++) {
+        for (int j = 0; j < 3; j++) {
+            stabilizer.dpos[i][j] = 0.0;  // 力制御の積分項
+            stabilizer.drot[i][j] = 0.0;  // モーメント制御の積分項
+        }
+    }
     
     // フットステップをクリア・再初期化
     footstep.steps.clear();

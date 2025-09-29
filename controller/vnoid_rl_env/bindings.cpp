@@ -1,22 +1,34 @@
+// ★★★ sample_controller_mujocoベース：インタラクティブ表示版 ★★★
+
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include <pybind11/stl.h>
 #include "myrobot.h"
 #include <GLFW/glfw3.h>
 #include <mujoco/mujoco.h>
-#include <mutex>
 #include <memory>
 #include <stdexcept>
 
 namespace py = pybind11;
 using namespace cnoid::vnoid;
 
-// ★★★ GLFW管理のスレッドセーフティを強化 ★★★
-static std::mutex g_glfw_mutex;
-static int g_glfw_init_count = 0;
-static bool g_glfw_initialized = false;
+// ★★★ コールバック関数の前方宣言 ★★★
+void keyboard(GLFWwindow* window, int key, int scancode, int act, int mods);
+void mouse_button(GLFWwindow* window, int button, int act, int mods);
+void mouse_move(GLFWwindow* window, double xpos, double ypos);
+void scroll(GLFWwindow* window, double xoffset, double yoffset);
 
-// C++側のGym環境を管理するクラス
+// ★★★ sample_controller_mujocoと同じグローバル変数（インタラクション用） ★★★
+// これらは1つのVnoidEnvインスタンスでのみ使用される
+static bool button_left = false;
+static bool button_middle = false;
+static bool button_right = false;
+static double lastx = 0;
+static double lasty = 0;
+
+
+
+// ★★★ シンプル設計のVnoidEnv ★★★
 class VnoidEnv {
 private:
     // MuJoCoのデータ
@@ -27,40 +39,47 @@ private:
     std::unique_ptr<MyRobot> robot;
     double previous_x = 0.0;
 
-    // レンダリング用のオブジェクト
+    // レンダリング用のオブジェクト（オプショナル）
     mjvCamera cam;
     mjvOption opt;
     mjvScene scn;
     mjrContext con;
-    mjrRect viewport;
     GLFWwindow* window = nullptr;
     
     // 初期化状態を追跡
     bool initialized = false;
+    bool rendering_enabled = false;
+    bool glfw_initialized = false;
     bool scene_initialized = false;
     bool context_initialized = false;
 
 public:
     int frame_skip;
 
-    // コンストラクタ
-    VnoidEnv(const std::string& model_path) {
+    VnoidEnv(const std::string& model_path, bool enable_rendering = false) 
+        : rendering_enabled(enable_rendering) {
         try {
-            initializeGLFW();
             loadModel(model_path);
             initializeRobot();
-            initializeRenderer();
+            
+            // レンダリングが必要な場合のみ初期化
+            if (rendering_enabled) {
+                initializeGLFW();
+                initializeRenderer();
+            }
+            
             initialized = true;
-            const double video_fps = 30.0;
+            const double video_fps = 60.0;
             this->frame_skip = (1.0 / video_fps) / m->opt.timestep;
-            printf("DEBUG INFO: Frame skip set to %d\n", this->frame_skip);
+            
+            printf("DEBUG INFO: VnoidEnv initialized (rendering: %s)\n", 
+                   rendering_enabled ? "enabled" : "disabled");
         } catch (...) {
             cleanup();
             throw;
         }
     }
 
-    // デストラクタ
     ~VnoidEnv() {
         cleanup();
     }
@@ -68,37 +87,14 @@ public:
     // コピー・ムーブを禁止
     VnoidEnv(const VnoidEnv&) = delete;
     VnoidEnv& operator=(const VnoidEnv&) = delete;
-    VnoidEnv(VnoidEnv&&) = delete;
-    VnoidEnv& operator=(VnoidEnv&&) = delete;
+
+    // ★★★ コールバック用のアクセサ ★★★
+    mjModel* GetModel() { return m; }
+    mjData* GetData() { return d; }
+    mjvCamera* GetCamera() { return &cam; }
+    mjvScene* GetScene() { return &scn; }
 
 private:
-    void initializeGLFW() {
-        std::lock_guard<std::mutex> lock(g_glfw_mutex);
-        
-        if (!g_glfw_initialized) {
-            if (!glfwInit()) {
-                throw std::runtime_error("GLFWの初期化に失敗しました。");
-            }
-            g_glfw_initialized = true;
-        }
-        g_glfw_init_count++;
-        
-        // 不可視ウィンドウを作成
-        glfwWindowHint(GLFW_VISIBLE, GLFW_FALSE);
-        glfwWindowHint(GLFW_DOUBLEBUFFER, GLFW_TRUE);
-        window = glfwCreateWindow(1280, 720, "Headless MuJoCo", nullptr, nullptr);
-        
-        if (!window) {
-            if (--g_glfw_init_count == 0 && g_glfw_initialized) {
-                glfwTerminate();
-                g_glfw_initialized = false;
-            }
-            throw std::runtime_error("GLFWウィンドウの作成に失敗しました。");
-        }
-        
-        glfwMakeContextCurrent(window);
-    }
-
     void loadModel(const std::string& model_path) {
         char error[1000] = {0};
         m = mj_loadXML(model_path.c_str(), nullptr, error, 1000);
@@ -120,41 +116,53 @@ private:
         robot->Init(m, d);
     }
 
+    // ★★★ sample_controller_mujocoと同じGLFW初期化 ★★★
+    void initializeGLFW() {
+        // init GLFW (sample_controller_mujocoと同じ)
+        if (!glfwInit()) {
+            throw std::runtime_error("Could not initialize GLFW");
+        }
+        glfw_initialized = true;
+
+        // ★★★ sample_controller_mujocoと同じ可視ウィンドウ作成 ★★★
+        window = glfwCreateWindow(1200, 900, "VnoidEnv Interactive", NULL, NULL);
+        
+        if (!window) {
+            glfwTerminate();
+            glfw_initialized = false;
+            throw std::runtime_error("GLFWウィンドウの作成に失敗しました。");
+        }
+        
+        glfwMakeContextCurrent(window);
+        glfwSwapInterval(1);
+
+        // ★★★ sample_controller_mujocoと同じコールバック設定 ★★★
+        glfwSetWindowUserPointer(window, this);  // thisポインタを保存
+        glfwSetKeyCallback(window, keyboard);
+        glfwSetCursorPosCallback(window, mouse_move);
+        glfwSetMouseButtonCallback(window, mouse_button);
+        glfwSetScrollCallback(window, scroll);
+    }
+
+    // ★★★ sample_controller_mujocoと同じレンダリング初期化 ★★★
     void initializeRenderer() {
-        // カメラとオプションの初期化
+        // ★★★ sample_controller_mujocoと同じ初期化 ★★★
         mjv_defaultCamera(&cam);
         mjv_defaultOption(&opt);
-
-        // ★★★ カメラ位置をロボット中心に調整 ★★★
-        // ロボットを追跡するカメラ設定
-        cam.type = mjCAMERA_TRACKING;  // 追跡カメラモード
-        cam.trackbodyid = 0;           // 胴体（通常はindex 0）を追跡
-        cam.distance = 3.0;            // ロボットからの距離（メートル）
-        cam.elevation = -20;           // 仰角（度）- 少し上から見下ろす
-        cam.azimuth = 45;              // 方位角（度）- 斜め前から
         
-        // または固定カメラの場合：
-        // cam.type = mjCAMERA_FREE;
-        // cam.lookat[0] = 0.0;  // ロボットの位置を見る（X座標）
-        // cam.lookat[1] = 0.0;  // Y座標
-        // cam.lookat[2] = 1.0;  // Z座標（ロボットの腰あたりの高さ）
-        
-        // シーンの初期化
-        memset(&scn, 0, sizeof(mjvScene));
+        // create scene and context (sample_controller_mujocoと同じ)
         mjv_makeScene(m, &scn, 2000);
         scene_initialized = true;
         
-        // レンダリングコンテキストの初期化
-        memset(&con, 0, sizeof(mjrContext));
         mjr_makeContext(m, &con, mjFONTSCALE_150);
         context_initialized = true;
-        
-        // ★★★ ビューポートのサイズを大きくして高画質化 ★★★
-        viewport = {0, 0, 1280, 720};  // HD解像度に変更
     }
 
     void cleanup() {
-        // レンダリング関連のクリーンアップ
+        // ロボットのクリーンアップ
+        robot.reset();
+        
+        // ★★★ sample_controller_mujocoと同じクリーンアップ順序 ★★★
         if (scene_initialized) {
             mjv_freeScene(&scn);
             scene_initialized = false;
@@ -176,81 +184,34 @@ private:
             m = nullptr;
         }
         
-        // ロボットのクリーンアップ
-        robot.reset();
-        
-        // GLFWのクリーンアップ
-        std::lock_guard<std::mutex> lock(g_glfw_mutex);
+        // ★★★ sample_controller_mujocoと同じGLFWクリーンアップ ★★★
         if (window) {
             glfwDestroyWindow(window);
             window = nullptr;
         }
         
-        if (--g_glfw_init_count == 0 && g_glfw_initialized) {
+        if (glfw_initialized) {
+            // terminate GLFW (sample_controller_mujocoと同じコメント付き)
+            #if defined(__APPLE__) || defined(_WIN32)
             glfwTerminate();
-            g_glfw_initialized = false;
+            #endif
+            glfw_initialized = false;
         }
     }
 
 public:
     py::array_t<double> reset() {
-    if (!initialized) {
-        throw std::runtime_error("環境が初期化されていません。");
+        if (!initialized) {
+            throw std::runtime_error("環境が初期化されていません。");
+        }
+        
+        mj_resetData(m, d);
+        mj_forward(m, d);
+        robot->ResetState();
+        previous_x = d->qpos[0];
+        
+        return get_observation();
     }
-    
-    printf("DEBUG: Reset開始\n");
-    
-    // 1. MuJoCoの物理状態を完全にリセット
-    mj_resetData(m, d);
-
-    double com_height = 0.8;  // デフォルト値
-    
-    // 2. ロボットの初期姿勢を明示的に設定（MuJoCoのqpos配列を直接操作）
-    // ベース位置 (floating base: x, y, z, qw, qx, qy, qz)
-    d->qpos[0] = 0.0;  // x位置
-    d->qpos[1] = 0.0;  // y位置  
-    d->qpos[2] = com_height;  // z位置（重心高さ）
-    d->qpos[3] = 1.0;  // qw (クォータニオンw成分)
-    d->qpos[4] = 0.0;  // qx
-    d->qpos[5] = 0.0;  // qy
-    d->qpos[6] = 0.0;  // qz
-    
-    // 関節角度をすべて0にリセット（7番目以降が関節角度）
-    for (int i = 7; i < m->nq; ++i) {
-        d->qpos[i] = 0.0;
-    }
-    
-    // 速度もすべて0にリセット
-    for (int i = 0; i < m->nv; ++i) {
-        d->qvel[i] = 0.0;
-    }
-    
-    // 加速度も0にリセット
-    for (int i = 0; i < m->nv; ++i) {
-        d->qacc[i] = 0.0;
-    }
-    
-    // 制御入力も0にリセット
-    for (int i = 0; i < m->nu; ++i) {
-        d->ctrl[i] = 0.0;
-    }
-    
-    // 3. MuJoCoの順運動学を実行して、位置・速度・力を更新
-    mj_forward(m, d);
-    
-    // 4. vnoidの内部状態を完全にリセット
-    robot->ResetState();
-    
-    // 5. 追跡用変数もリセット
-    previous_x = d->qpos[0];
-    
-    printf("DEBUG: Reset完了 - MuJoCo状態とVnoid状態がリセットされました\n");
-    printf("DEBUG: 初期位置 = (%.3f, %.3f, %.3f)\n", d->qpos[0], d->qpos[1], d->qpos[2]);
-    printf("DEBUG: 初期クォータニオン = (%.3f, %.3f, %.3f, %.3f)\n", 
-           d->qpos[3], d->qpos[4], d->qpos[5], d->qpos[6]);
-    
-    return get_observation();
-}
 
     py::tuple step(py::array_t<double> action) {
         if (!initialized) {
@@ -267,11 +228,15 @@ public:
         rl_params.foot_offset.x() = ptr[0];
         rl_params.foot_offset.y() = ptr[1];
 
-        // vnoidの制御サイクルとMuJoCoのシミュレーション
-        // ★★★ フレームスキップを実装 ★★★
+        // ★★★ sample_controller_mujocoと同じ制御パターン ★★★
         for (int i = 0; i < this->frame_skip; ++i) {
             robot->Control(rl_params);
             mj_step(m, d);
+        }
+
+        // ★★★ レンダリングが有効な場合は画面更新 ★★★
+        if (rendering_enabled && !glfwWindowShouldClose(window)) {
+            updateDisplay();
         }
 
         py::array_t<double> obs = get_observation();
@@ -281,20 +246,37 @@ public:
         return py::make_tuple(obs, reward, terminated, py::dict());
     }
 
+    // ★★★ sample_controller_mujocoと同じ表示更新 ★★★
+    void updateDisplay() {
+        if (!rendering_enabled || !window) return;
+
+        // get framebuffer viewport (sample_controller_mujocoと同じ)
+        mjrRect viewport = {0, 0, 0, 0};
+        glfwGetFramebufferSize(window, &viewport.width, &viewport.height);
+
+        // update scene and render (sample_controller_mujocoと同じ)
+        mjv_updateScene(m, d, &opt, NULL, &cam, mjCAT_ALL, &scn);
+        mjr_render(viewport, &scn, &con);
+
+        // swap OpenGL buffers (sample_controller_mujocoと同じ)
+        glfwSwapBuffers(window);
+
+        // process pending GUI events (sample_controller_mujocoと同じ)
+        glfwPollEvents();
+    }
+
+    // ★★★ 録画用レンダリング（画面表示とは別） ★★★
     py::array_t<unsigned char> render() {
-        if (!initialized || !scene_initialized || !context_initialized) {
-            throw std::runtime_error("レンダリング環境が初期化されていません。");
+        if (!rendering_enabled || !scene_initialized || !context_initialized) {
+            throw std::runtime_error("レンダリングが無効化されています。");
         }
         
         try {
-
-            for (int i = 0; i < 3; ++i) {
-            cam.lookat[i] = d->qpos[i];
-        }
-            // シーンデータを更新
-            mjv_updateScene(m, d, &opt, nullptr, &cam, mjCAT_ALL, &scn);
+            // 録画用の固定ビューポート
+            mjrRect viewport = {0, 0, 1280, 720};
             
-            // シーンを描画バッファにレンダリング
+            // シーン更新・レンダリング
+            mjv_updateScene(m, d, &opt, nullptr, &cam, mjCAT_ALL, &scn);
             mjr_render(viewport, &scn, &con);
             
             // ピクセルデータを読み出し
@@ -302,7 +284,7 @@ public:
             auto buffer = std::make_unique<unsigned char[]>(buffer_size);
             mjr_readPixels(buffer.get(), nullptr, viewport, &con);
             
-            // Python配列に変換（スマートポインタを使用してメモリ安全性を確保）
+            // Python配列に変換
             py::capsule free_when_done(buffer.release(), [](void *f) {
                 delete[] static_cast<unsigned char *>(f);
             });
@@ -316,6 +298,14 @@ public:
         } catch (const std::exception& e) {
             throw std::runtime_error("レンダリング中にエラーが発生しました: " + std::string(e.what()));
         }
+    }
+
+    bool is_rendering_enabled() const {
+        return rendering_enabled;
+    }
+
+    bool should_close() const {
+        return rendering_enabled ? glfwWindowShouldClose(window) : false;
     }
 
 private:
@@ -345,11 +335,81 @@ private:
     }
 };
 
-// pybind11モジュール定義
+// ★★★ sample_controller_mujocoと同じコールバック関数群 ★★★
+void keyboard(GLFWwindow* window, int key, int scancode, int act, int mods) {
+    // VnoidEnvインスタンスを取得してリセット操作
+    VnoidEnv* env = static_cast<VnoidEnv*>(glfwGetWindowUserPointer(window));
+    if (act == GLFW_PRESS && key == GLFW_KEY_BACKSPACE && env) {
+        // backspace: reset simulation
+        mj_resetData(env->GetModel(), env->GetData());
+        mj_forward(env->GetModel(), env->GetData());
+    }
+}
+
+void mouse_button(GLFWwindow* window, int button, int act, int mods) {
+    // update button state
+    button_left = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS);
+    button_middle = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS);
+    button_right = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS);
+
+    // update mouse position
+    glfwGetCursorPos(window, &lastx, &lasty);
+}
+
+void mouse_move(GLFWwindow* window, double xpos, double ypos) {
+    // no buttons down: nothing to do
+    if (!button_left && !button_middle && !button_right) {
+        return;
+    }
+
+    VnoidEnv* env = static_cast<VnoidEnv*>(glfwGetWindowUserPointer(window));
+    if (!env) return;
+
+    // compute mouse displacement, save
+    double dx = xpos - lastx;
+    double dy = ypos - lasty;
+    lastx = xpos;
+    lasty = ypos;
+
+    // get current window size
+    int width, height;
+    glfwGetWindowSize(window, &width, &height);
+
+    // get shift key state
+    bool mod_shift = (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
+                      glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS);
+
+    // determine action based on mouse button
+    mjtMouse action;
+    if (button_right) {
+        action = mod_shift ? mjMOUSE_MOVE_H : mjMOUSE_MOVE_V;
+    } else if (button_left) {
+        action = mod_shift ? mjMOUSE_ROTATE_H : mjMOUSE_ROTATE_V;
+    } else {
+        action = mjMOUSE_ZOOM;
+    }
+
+    // move camera
+    mjv_moveCamera(env->GetModel(), action, dx/height, dy/height, env->GetScene(), env->GetCamera());
+}
+
+void scroll(GLFWwindow* window, double xoffset, double yoffset) {
+    VnoidEnv* env = static_cast<VnoidEnv*>(glfwGetWindowUserPointer(window));
+    if (!env) return;
+
+    // emulate vertical mouse motion = 5% of window height
+    mjv_moveCamera(env->GetModel(), mjMOUSE_ZOOM, 0, -0.05*yoffset, env->GetScene(), env->GetCamera());
+}
+
+// ★★★ pybind11モジュール定義（インタラクティブ版） ★★★
 PYBIND11_MODULE(vnoid_rl_env, m) {
     py::class_<VnoidEnv>(m, "VnoidEnv")
-        .def(py::init<const std::string&>())
+        .def(py::init<const std::string&>())  // デフォルト：レンダリングなし
+        .def(py::init<const std::string&, bool>())  // レンダリング有効化オプション
         .def("step", &VnoidEnv::step)
         .def("reset", &VnoidEnv::reset)
-        .def("render", &VnoidEnv::render);
+        .def("render", &VnoidEnv::render)
+        .def("update_display", &VnoidEnv::updateDisplay)
+        .def("should_close", &VnoidEnv::should_close)
+        .def("is_rendering_enabled", &VnoidEnv::is_rendering_enabled);
 }

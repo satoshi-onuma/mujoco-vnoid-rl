@@ -11,6 +11,14 @@ RobotMujoco::RobotMujoco(){
 void RobotMujoco::Init(mjModel* _m, mjData* _d, const Param& param, Timer& timer, vector<Joint>& joint){
     m   = _m;
     d   = _d;
+
+	// ★★★ 診断情報を追加 ★★★
+    printf("=== MuJoCo vs vnoid 関節数診断 ===\n");
+    printf("MuJoCo nq (qpos size): %d\n", m->nq);
+    printf("MuJoCo nv (qvel size): %d\n", m->nv); 
+    printf("MuJoCo nu (ctrl size): %d\n", m->nu);
+    printf("vnoid joint size: %d\n", (int)joint.size());
+    printf("=====================================\n");
     
     joint_pos_filter.resize(joint.size());
 	for (int i = 0; i < joint.size(); ++i) {
