@@ -8,6 +8,8 @@
 #include <mujoco/mujoco.h>
 #include <memory>
 #include <stdexcept>
+#include <iostream>
+#include <thread>
 
 namespace py = pybind11;
 using namespace cnoid::vnoid;
@@ -38,6 +40,7 @@ private:
     // vnoidのロボットクラス
     std::unique_ptr<MyRobot> robot;
     double previous_x = 0.0;
+    int frame_skip;
 
     // レンダリング用のオブジェクト（オプショナル）
     mjvCamera cam;
@@ -54,34 +57,92 @@ private:
     bool context_initialized = false;
 
 public:
-    int frame_skip;
+    
 
     VnoidEnv(const std::string& model_path, bool enable_rendering = false) 
         : rendering_enabled(enable_rendering) {
-        try {
-            loadModel(model_path);
-            initializeRobot();
-            
-            // レンダリングが必要な場合のみ初期化
-            if (rendering_enabled) {
+               std::cout << "VnoidEnv初期化開始 (レンダリング: " 
+                  << (enable_rendering ? "有効" : "無効") << ")" << std::endl;
+        
+        // MuJoCoモデル読み込み（常に実行）
+        char error[1000] = "Could not load model";
+        m = mj_loadXML(model_path.c_str(), nullptr, error, 1000);
+        if (!m) {
+            throw std::runtime_error("モデル読み込み失敗: " + std::string(error));
+        }
+        
+        d = mj_makeData(m);
+        if (!d) {
+            throw std::runtime_error("データ初期化失敗");
+        }
+        
+        // ロボットコントローラ初期化
+        robot = std::make_unique<MyRobot>();
+        robot->Init(m, d);
+        
+        // ★★★ sample_controller_mujocoと同じ60fps制御 ★★★
+        // 1/60秒 = 0.01667秒をシミュレーション時間で進める
+        const double control_period = 1.0 / 60.0;  // 60fps
+        frame_skip = static_cast<int>(control_period / m->opt.timestep);
+        
+        std::cout << "フレームスキップ設定: " << frame_skip 
+                  << " (60fps制御, MuJoCo timestep=" << m->opt.timestep << "秒)" << std::endl;
+        
+        // ★★★ レンダリングが有効な場合のみOpenGL初期化 ★★★
+        if (rendering_enabled) {
+            try {
                 initializeGLFW();
                 initializeRenderer();
+                std::cout << "✅ OpenGL初期化成功" << std::endl;
+            } catch (const std::exception& e) {
+                std::cerr << "⚠️ OpenGL初期化失敗: " << e.what() << std::endl;
+                std::cerr << "⚠️ レンダリングを無効化して続行します" << std::endl;
+                rendering_enabled = false;
+                
+                // 部分的に初期化された状態をクリーンアップ
+                if (window) {
+                    glfwDestroyWindow(window);
+                    window = nullptr;
+                }
+                if (glfw_initialized) {
+                    glfwTerminate();
+                    glfw_initialized = false;
+                }
             }
-            
-            initialized = true;
-            const double video_fps = 60.0;
-            this->frame_skip = (1.0 / video_fps) / m->opt.timestep;
-            
-            printf("DEBUG INFO: VnoidEnv initialized (rendering: %s)\n", 
-                   rendering_enabled ? "enabled" : "disabled");
-        } catch (...) {
-            cleanup();
-            throw;
         }
+        
+        initialized = true;
+        previous_x = d->qpos[0];
+        
+        std::cout << "✅ VnoidEnv初期化完了" << std::endl;
     }
 
     ~VnoidEnv() {
         cleanup();
+    }
+
+    py::array_t<double> get_observation() {
+        std::vector<double> obs;
+        obs.reserve(m->nq + m->nv);
+        
+        for (int i = 0; i < m->nq; ++i) obs.push_back(d->qpos[i]);
+        for (int i = 0; i < m->nv; ++i) obs.push_back(d->qvel[i]);
+        
+        return py::array_t<double>(obs.size(), obs.data());
+    }
+
+    double compute_reward() {
+        double current_x = d->qpos[0];
+        double forward_reward = current_x - previous_x;
+        previous_x = current_x;
+        
+        double healthy_reward = 1.0;
+        return forward_reward * 5.0 + healthy_reward;
+    }
+
+    bool check_termination() {
+        double hips_z_position = d->qpos[2];
+        return (hips_z_position < 0.5);
     }
 
     // コピー・ムーブを禁止
@@ -95,21 +156,7 @@ public:
     mjvScene* GetScene() { return &scn; }
 
 private:
-    void loadModel(const std::string& model_path) {
-        char error[1000] = {0};
-        m = mj_loadXML(model_path.c_str(), nullptr, error, 1000);
-        
-        if (!m) {
-            throw std::runtime_error("モデルファイルの読み込みに失敗しました: " + std::string(error));
-        }
-        
-        d = mj_makeData(m);
-        if (!d) {
-            throw std::runtime_error("MuJoCoデータの作成に失敗しました。");
-        }
-        
-        printf("DEBUG INFO: nq = %d, nv = %d, Total Obs Size = %d\n", m->nq, m->nv, m->nq + m->nv);
-    }
+    
 
     void initializeRobot() {
         robot = std::make_unique<MyRobot>();
@@ -149,6 +196,8 @@ private:
         // ★★★ sample_controller_mujocoと同じ初期化 ★★★
         mjv_defaultCamera(&cam);
         mjv_defaultOption(&opt);
+        mjv_defaultScene(&scn);     // ← これが足りない！
+mjr_defaultContext(&con);
         
         // create scene and context (sample_controller_mujocoと同じ)
         mjv_makeScene(m, &scn, 2000);
@@ -201,22 +250,32 @@ private:
 
 public:
     py::array_t<double> reset() {
-        if (!initialized) {
-            throw std::runtime_error("環境が初期化されていません。");
-        }
-        
-        mj_resetData(m, d);
-        mj_forward(m, d);
-        robot->ResetState();
-        previous_x = d->qpos[0];
-        
-        return get_observation();
+    if (!initialized) {
+        throw std::runtime_error("環境が初期化されていません。");
     }
+    
+    // データを完全に削除して再作成
+    mj_deleteData(d);
+    d = mj_makeData(m);
+    
+    // ロボットも完全に再初期化
+    robot = std::make_unique<MyRobot>();
+    robot->Init(m, d);
+    
+    mj_forward(m, d);
+    previous_x = d->qpos[0];
+    
+    return get_observation();
+}
 
     py::tuple step(py::array_t<double> action) {
         if (!initialized) {
             throw std::runtime_error("環境が初期化されていません。");
         }
+         // ★★★ デバッグ用のログ出力を追加 ★★★
+    // どのプロセスがstepを呼び出したか確認
+    // C++11のスレッドIDを使って、簡易的にワーカーを識別
+    std::cout << "[Worker " << std::this_thread::get_id() << "] Python step() called." << std::endl;
         
         auto buf = action.request();
         if (buf.ndim != 1 || buf.size < 2) {
@@ -230,9 +289,15 @@ public:
 
         // ★★★ sample_controller_mujocoと同じ制御パターン ★★★
         for (int i = 0; i < this->frame_skip; ++i) {
+              if (i == 0 || (i + 1) % 50 == 0) { // 最初のステップと50ステップごとに進捗表示
+            std::cout << "  [Worker " << std::this_thread::get_id() << "]  Physics step " 
+                      << (i + 1) << " / " << this->frame_skip << std::endl;
+        }
             robot->Control(rl_params);
             mj_step(m, d);
         }
+         // ★★★ デバッグ用のログ出力を追加 ★★★
+    std::cout << "[Worker " << std::this_thread::get_id() << "] Python step() finished." << std::endl;
 
         // ★★★ レンダリングが有効な場合は画面更新 ★★★
         if (rendering_enabled && !glfwWindowShouldClose(window)) {
@@ -309,97 +374,62 @@ public:
     }
 
 private:
-    py::array_t<double> get_observation() {
-        const int obs_size = m->nq + m->nv;
-        py::array_t<double> obs(obs_size);
-        auto obs_ptr = obs.mutable_data();
-
-        memcpy(obs_ptr, d->qpos, m->nq * sizeof(double));
-        memcpy(obs_ptr + m->nq, d->qvel, m->nv * sizeof(double));
-
-        return obs;
+    // GLFWコールバック関数
+    static void keyboard(GLFWwindow* window, int key, int scancode, int act, int mods) {
+        if (act == GLFW_PRESS && key == GLFW_KEY_BACKSPACE) {
+            VnoidEnv* env = static_cast<VnoidEnv*>(glfwGetWindowUserPointer(window));
+            if (env) {
+                mj_resetData(env->m, env->d);
+                mj_forward(env->m, env->d);
+                env->robot->ResetState();
+            }
+        }
     }
 
-    double compute_reward() {
-        double current_x = d->qpos[0];
-        double forward_reward = current_x - previous_x;
-        previous_x = current_x;
-        
-        double healthy_reward = 1.0;
-        return forward_reward * 5.0 + healthy_reward;
+    static void mouse_button(GLFWwindow* window, int button, int act, int mods) {
+        button_left = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS);
+        button_middle = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS);
+        button_right = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS);
+        glfwGetCursorPos(window, &lastx, &lasty);
     }
 
-    bool check_termination() {
-        double hips_z_position = d->qpos[2];
-        return (hips_z_position < 0.5);
+    static void mouse_move(GLFWwindow* window, double xpos, double ypos) {
+        VnoidEnv* env = static_cast<VnoidEnv*>(glfwGetWindowUserPointer(window));
+        if (!env || !button_left && !button_middle && !button_right) return;
+
+        double dx = xpos - lastx;
+        double dy = ypos - lasty;
+        lastx = xpos;
+        lasty = ypos;
+
+        int width, height;
+        glfwGetWindowSize(window, &width, &height);
+
+        bool mod_shift = (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
+                          glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS);
+
+        mjtMouse action;
+        if (button_right) {
+            action = mod_shift ? mjMOUSE_MOVE_H : mjMOUSE_MOVE_V;
+        } else if (button_left) {
+            action = mod_shift ? mjMOUSE_ROTATE_H : mjMOUSE_ROTATE_V;
+        } else {
+            action = mjMOUSE_ZOOM;
+        }
+
+        mjv_moveCamera(env->GetModel(), action, dx/height, dy/height, env->GetScene(), env->GetCamera());
     }
+
+    static void scroll(GLFWwindow* window, double xoffset, double yoffset) {
+        VnoidEnv* env = static_cast<VnoidEnv*>(glfwGetWindowUserPointer(window));
+        if (!env) return;
+        mjv_moveCamera(env->GetModel(), mjMOUSE_ZOOM, 0, -0.05*yoffset, env->GetScene(), env->GetCamera());
+    }
+
+    
 };
 
-// ★★★ sample_controller_mujocoと同じコールバック関数群 ★★★
-void keyboard(GLFWwindow* window, int key, int scancode, int act, int mods) {
-    // VnoidEnvインスタンスを取得してリセット操作
-    VnoidEnv* env = static_cast<VnoidEnv*>(glfwGetWindowUserPointer(window));
-    if (act == GLFW_PRESS && key == GLFW_KEY_BACKSPACE && env) {
-        // backspace: reset simulation
-        mj_resetData(env->GetModel(), env->GetData());
-        mj_forward(env->GetModel(), env->GetData());
-    }
-}
 
-void mouse_button(GLFWwindow* window, int button, int act, int mods) {
-    // update button state
-    button_left = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS);
-    button_middle = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_MIDDLE) == GLFW_PRESS);
-    button_right = (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS);
-
-    // update mouse position
-    glfwGetCursorPos(window, &lastx, &lasty);
-}
-
-void mouse_move(GLFWwindow* window, double xpos, double ypos) {
-    // no buttons down: nothing to do
-    if (!button_left && !button_middle && !button_right) {
-        return;
-    }
-
-    VnoidEnv* env = static_cast<VnoidEnv*>(glfwGetWindowUserPointer(window));
-    if (!env) return;
-
-    // compute mouse displacement, save
-    double dx = xpos - lastx;
-    double dy = ypos - lasty;
-    lastx = xpos;
-    lasty = ypos;
-
-    // get current window size
-    int width, height;
-    glfwGetWindowSize(window, &width, &height);
-
-    // get shift key state
-    bool mod_shift = (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS ||
-                      glfwGetKey(window, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS);
-
-    // determine action based on mouse button
-    mjtMouse action;
-    if (button_right) {
-        action = mod_shift ? mjMOUSE_MOVE_H : mjMOUSE_MOVE_V;
-    } else if (button_left) {
-        action = mod_shift ? mjMOUSE_ROTATE_H : mjMOUSE_ROTATE_V;
-    } else {
-        action = mjMOUSE_ZOOM;
-    }
-
-    // move camera
-    mjv_moveCamera(env->GetModel(), action, dx/height, dy/height, env->GetScene(), env->GetCamera());
-}
-
-void scroll(GLFWwindow* window, double xoffset, double yoffset) {
-    VnoidEnv* env = static_cast<VnoidEnv*>(glfwGetWindowUserPointer(window));
-    if (!env) return;
-
-    // emulate vertical mouse motion = 5% of window height
-    mjv_moveCamera(env->GetModel(), mjMOUSE_ZOOM, 0, -0.05*yoffset, env->GetScene(), env->GetCamera());
-}
 
 // ★★★ pybind11モジュール定義（インタラクティブ版） ★★★
 PYBIND11_MODULE(vnoid_rl_env, m) {

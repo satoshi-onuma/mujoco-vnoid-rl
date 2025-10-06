@@ -99,7 +99,7 @@ void scroll(GLFWwindow* window, double xoffset, double yoffset) {
 int main(int argc, const char** argv) {
     // load and compile model
     char error[1000];
-    const char* filename = "../share/model/sample_robot/sample_robot_mujoco.xml";
+    const char* filename = "./model/sample_robot/sample_robot_mujoco.xml";
     m = mj_loadXML(filename, 0, error, 1000);
     if (!m) {
         mju_error("Load model error: %s", error);

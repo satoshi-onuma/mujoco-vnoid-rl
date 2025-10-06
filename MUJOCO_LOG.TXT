@@ -67,3 +67,150 @@ ERROR: gladLoadGL error
 Tue Sep  9 13:23:21 2025
 ERROR: gladLoadGL error
 
+Mon Sep 29 18:47:03 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 18:53:41 2025
+ERROR: Load model error: ParseXML: Error opening file '../share/model/sample_robot/sample_robot_mujoco.xml': No such file or directory
+
+Mon Sep 29 18:55:29 2025
+ERROR: Load model error: ParseXML: Error opening file '../share/model/sample_robot/sample_robot_mujoco.xml': No such file or directory
+
+Mon Sep 29 18:55:50 2025
+ERROR: Load model error: ParseXML: Error opening file '../model/sample_robot/sample_robot_mujoco.xml': No such file or directory
+
+Mon Sep 29 18:57:02 2025
+ERROR: Load model error: ParseXML: Error opening file '../../model/sample_robot/sample_robot_mujoco.xml': No such file or directory
+
+Mon Sep 29 18:57:34 2025
+ERROR: Load model error: ParseXML: Error opening file '../../../model/sample_robot/sample_robot_mujoco.xml': No such file or directory
+
+Mon Sep 29 19:01:32 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:01:35 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:01:37 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:06:04 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:08:20 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:16 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:16 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:16 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:16 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:16 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:16 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:16 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:16 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:18 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:18 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:18 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:19 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:19 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:19 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:19 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:19 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:21 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:21 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:21 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:21 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:21 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:22 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:22 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:22 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:24 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:24 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:24 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:24 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:24 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:24 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:25 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:25 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:26 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:26 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:26 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:26 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:27 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
+Mon Sep 29 19:22:27 2025
+ERROR: OpenGL ARB_framebuffer_object required
+
