@@ -156,7 +156,7 @@ void MyRobot::Init(mjModel* _m, mjData* _d){
     
 }
 
-// myrobot.cpp
+/*
 void MyRobot::ResetState() {
     // タイマーをリセット
     timer.count = 0;
@@ -246,6 +246,10 @@ void MyRobot::ResetState() {
     }
 }
 
+*/ 
+
+
+
 void MyRobot::Control(const RLParams& rl_params){ // ★引数を追加
     if(timer.count % param.control_cycle == 0){    
         RobotMujoco::Sense(timer, base, foot, joint);
@@ -253,7 +257,7 @@ void MyRobot::Control(const RLParams& rl_params){ // ★引数を追加
         // calc FK
         fk_solver.Comp(param, joint, base, centroid, hand, foot);
 
-	    if(timer.count % 10 == 0){
+        if(timer.count % 10 == 0){
 		    // erase current footsteps
 		    while(footstep.steps.size() > 2)
 			    footstep.steps.pop_back();
@@ -273,10 +277,8 @@ void MyRobot::Control(const RLParams& rl_params){ // ★引数を追加
             footstep_planner.GenerateDCM(param, footstep);
 	    }
 
-        // stepping controller generates swing foot trajectory 
-        // it also performs landing position adaptation
-        stepping_controller.Update(timer, param, footstep, footstep_buffer, centroid, base, foot,rl_params);//rl追加
-    
+        // ★ 常にrl_paramsを使う（1歩の間は同じ値が渡される前提）
+        stepping_controller.Update(timer, param, footstep, footstep_buffer,centroid, base, foot, rl_params);
         // stabilizer performs balance feedback
         stabilizer         .Update(timer, param, centroid, base, foot);
     

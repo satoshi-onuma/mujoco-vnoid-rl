@@ -17,4 +17,5 @@
 // RLからの指令を受け取るための構造体
  struct RLParams {
     Vector3 foot_offset = Vector3(0.0, 0.0, 0.0);
+    Vector3 foot_angle_offset = Vector3(0.0, 0.0, 0.0);
  };

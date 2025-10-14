@@ -34,12 +34,13 @@ config = (
     PPOConfig()
     .environment(env="HumanoidVnoid-v0")
     .env_runners(
-        num_env_runners=NUM_WORKERS,  # 並列環境数
-        rollout_fragment_length=100,
+        num_env_runners=NUM_WORKERS,
+        rollout_fragment_length=50,  # ★ 適度な長さ
+        sample_timeout_s=700.0,      # ★ 余裕を持たせる
     )
     .framework("torch")
     .training(
-        train_batch_size=8000,
+        train_batch_size=400,  # ★ 8×20×10 = 1600
         lr=1e-4,
         gamma=0.99,
         lambda_=0.95,
@@ -47,12 +48,8 @@ config = (
         entropy_coeff=0.0,
         num_sgd_iter=20,
     )
-    .resources(
-        num_gpus=0
-    )
-    .debugging(
-        seed=42
-    )
+    .resources(num_gpus=0)
+    .debugging(seed=42)
 )
 
 # sgd_minibatch_sizeは別途設定
@@ -69,6 +66,7 @@ checkpoint_dir = os.path.abspath("./humanoid_vnoid_checkpoint")
 print("🎓 学習開始...")
 print("-" * 70)
 
+
 for i in range(100):
     result = algo.train()
     
@@ -77,6 +75,7 @@ for i in range(100):
         reward = result["env_runners"]["episode_return_mean"]
     except KeyError:
         reward = 0.0
+        print("can't get reward")
     
     rewards.append(reward)
     

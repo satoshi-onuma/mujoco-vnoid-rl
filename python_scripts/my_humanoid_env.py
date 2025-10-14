@@ -19,6 +19,7 @@ except ImportError as e:
 
 
 class HumanoidVnoidEnv(gym.Env):
+    """離散的な歩行制御環境 (1ステップ = 1歩)"""
     """
     Vnoidヒューマノイド環境
     
@@ -58,20 +59,46 @@ class HumanoidVnoidEnv(gym.Env):
         self.enable_rendering = enable_rendering
         
         # 行動空間と観測空間の設定
-        self.action_space = gym.spaces.Box(low=-0.1, high=0.1, shape=(2,), dtype=np.float32)
+        self.action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(5,), dtype=np.float32)
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(73,), dtype=np.float64)
         
         mode_str = "録画モード(OpenGL有効)" if enable_rendering else "学習モード(OpenGL無効)"
         print(f"✅ HumanoidVnoidEnv初期化完了: {mode_str}")
 
     def step(self, action):
-        obs, reward, terminated, info = self.cpp_env.step(action)
-        truncated = False
-        return obs, reward, terminated, truncated, info
+         """
+        1歩分の実行
+        
+        Args:
+            action: [foot_offset_x, foot_offset_y, 
+                    foot_angle_roll, foot_angle_pitch, foot_angle_yaw]
+        
+        Returns:
+            obs, reward, terminated, truncated, info
+        """
+        # actionをスケーリング
+         rl_action = np.zeros(5, dtype=np.float64)
+         rl_action[0] = action[0] * 0.05   # foot_offset_x: ±5cm
+         rl_action[1] = action[1] * 0.05   # foot_offset_y: ±5cm
+         rl_action[2] = action[2] * 0.0 #0.0005  # foot_angle_roll: ±0.1rad およそ５度ずつ
+         rl_action[3] = action[3] * 0.0#0.0005  # foot_angle_pitch: ±0.1rad　およそ５度ずつ
+         rl_action[4] = action[4] * 0.0   # foot_angle_yaw: ±0.2rad　およそ５度ずつ
+
+         print(rl_action)
+
+        
+        # ★ 1歩完了まで実行（C++側で制御サイクルは1000Hz）
+        # C++のstep()は内部でframe_skip回のmj_step()を実行
+         obs, reward, terminated, info = self.cpp_env.step(rl_action)
+         print(reward)
+        
+         truncated = False
+         return obs, reward, terminated, truncated, info
 
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         obs = self.cpp_env.reset()
+        self._prev_step_completed = False
         info = {}
         return obs, info
 
@@ -122,12 +149,12 @@ def make_recording_env(config=None):
 register(
     id="HumanoidVnoid-v0",
     entry_point=make_training_env,
-    max_episode_steps=1000,
+    max_episode_steps=50,
 )
 
 # 録画用環境ID
 register(
     id="HumanoidVnoidRecording-v0", 
     entry_point=make_recording_env,
-    max_episode_steps=1000,
+    max_episode_steps=50,
 )

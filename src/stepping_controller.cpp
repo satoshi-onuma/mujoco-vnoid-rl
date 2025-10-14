@@ -126,6 +126,13 @@ void SteppingController::Update(const Timer& timer, const Param& param, Footstep
     stb1.foot_pos[swg].x() += rl_params.foot_offset.x();
     stb1.foot_pos[swg].y() += rl_params.foot_offset.y();
 
+    // ★ RLからの角度残差オフセット（新規追加）
+    stb1.foot_angle[swg].x() += rl_params.foot_angle_offset.x(); // roll
+    stb1.foot_angle[swg].y() += rl_params.foot_angle_offset.y(); // pitch
+    stb1.foot_angle[swg].z() += rl_params.foot_angle_offset.z(); // yaw
+    
+    stb1.foot_ori[swg] = FromRollPitchYaw(stb1.foot_angle[swg]);
+
     // reference base orientation is set as the middle of feet orientation
     double angle_diff = foot[1].angle_ref.z() - foot[0].angle_ref.z();
     while(angle_diff >  pi) angle_diff -= 2.0*pi;

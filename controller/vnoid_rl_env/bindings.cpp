@@ -82,8 +82,8 @@ public:
         
         // ★★★ sample_controller_mujocoと同じ60fps制御 ★★★
         // 1/60秒 = 0.01667秒をシミュレーション時間で進める
-        const double control_period = 1.0 / 60.0;  // 60fps
-        frame_skip = static_cast<int>(control_period / m->opt.timestep);
+        const double render_period = 1.0 / 60.0;  // 60fps
+        frame_skip = static_cast<int>(render_period / m->opt.timestep);
         
         std::cout << "フレームスキップ設定: " << frame_skip 
                   << " (60fps制御, MuJoCo timestep=" << m->opt.timestep << "秒)" << std::endl;
@@ -138,11 +138,6 @@ public:
         
         double healthy_reward = 1.0;
         return forward_reward * 5.0 + healthy_reward;
-    }
-
-    bool check_termination() {
-        double hips_z_position = d->qpos[2];
-        return (hips_z_position < 0.5);
     }
 
     // コピー・ムーブを禁止
@@ -278,38 +273,90 @@ public:
     std::cout << "[Worker " << std::this_thread::get_id() << "] Python step() called." << std::endl;
         
         auto buf = action.request();
-        if (buf.ndim != 1 || buf.size < 2) {
+        if (buf.ndim != 1 || buf.size < 5) {
             throw std::runtime_error("アクションの次元またはサイズが不正です。");
         }
         
         double* ptr = static_cast<double*>(buf.ptr);
         RLParams rl_params;
+         
+        // actionから設定
         rl_params.foot_offset.x() = ptr[0];
         rl_params.foot_offset.y() = ptr[1];
+        rl_params.foot_angle_offset.x() = ptr[2];
+        rl_params.foot_angle_offset.y() = ptr[3];
+        rl_params.foot_angle_offset.z() = ptr[4];
+
+        
+
+        bool step_completed = false;
+        int prev_support_leg = robot->footstep_buffer.steps[0].side;
+        int step_counter = 0;
+
+        const int MAX_ITERATIONS = 1000;
+        const double MIN_HEIGHT = 0.5;
+        bool terminated = false;
+        bool timeout = false;
 
         // ★★★ sample_controller_mujocoと同じ制御パターン ★★★
-        for (int i = 0; i < this->frame_skip; ++i) {
-              if (i == 0 || (i + 1) % 50 == 0) { // 最初のステップと50ステップごとに進捗表示
-            std::cout << "  [Worker " << std::this_thread::get_id() << "]  Physics step " 
-                      << (i + 1) << " / " << this->frame_skip << std::endl;
-        }
-            robot->Control(rl_params);
-            mj_step(m, d);
-        }
-         // ★★★ デバッグ用のログ出力を追加 ★★★
-    std::cout << "[Worker " << std::this_thread::get_id() << "] Python step() finished." << std::endl;
+        while (!step_completed && !terminated) {
+            // ★ 制御サイクル実行（frame_skip回のmj_step）
+            for (int i = 0; i < this->frame_skip; ++i) {
+                robot->Control(rl_params);
+                mj_step(m, d);
 
-        // ★★★ レンダリングが有効な場合は画面更新 ★★★
-        if (rendering_enabled && !glfwWindowShouldClose(window)) {
-            updateDisplay();
+                 // 毎ステップ転倒チェック
+                double hips_z = d->qpos[2];
+                if (hips_z < MIN_HEIGHT) {
+                    terminated = true;
+                    std::cout << "[INFO] Robot fell (height=" << hips_z << ")" << std::endl;
+                    break;
+                }
+                
+            }
+
+            if (terminated) break;
+        
+            // レンダリング更新（既存コードと同じ）
+            if (rendering_enabled && !glfwWindowShouldClose(window)) {
+                updateDisplay();
+            }
+        
+            // ★ 1歩完了を検出
+            int current_support_leg = robot->footstep_buffer.steps[0].side;
+            step_completed = (current_support_leg != prev_support_leg);
+        
+            if (step_completed) {
+                std::cout << "[INFO] Support leg changed: " << prev_support_leg 
+                        << " -> " << current_support_leg << std::endl;
+            }
+
+            step_counter++;
+
+            if (step_counter  >= MAX_ITERATIONS) {
+                terminated = true;
+                timeout = true;  // タイムアウトフラグをセット
+                std::cerr << "[WARNING] Step timeout" << std::endl;
+                break;
+            }
+    
+        
+        
+        }
+
+        if (step_completed && !terminated) {
+            std::cout << "[INFO] Step completed after " << step_counter << " iterations" << std::endl;
         }
 
         py::array_t<double> obs = get_observation();
         double reward = compute_reward();
-        bool terminated = check_termination();
+
+        if (timeout) {
+            reward = -10.0;
+        }
         
-        return py::make_tuple(obs, reward, terminated, py::dict());
-    }
+            return py::make_tuple(obs, reward, terminated, py::dict());
+        }
 
     // ★★★ sample_controller_mujocoと同じ表示更新 ★★★
     void updateDisplay() {
@@ -379,9 +426,7 @@ private:
         if (act == GLFW_PRESS && key == GLFW_KEY_BACKSPACE) {
             VnoidEnv* env = static_cast<VnoidEnv*>(glfwGetWindowUserPointer(window));
             if (env) {
-                mj_resetData(env->m, env->d);
-                mj_forward(env->m, env->d);
-                env->robot->ResetState();
+                env->reset();
             }
         }
     }
