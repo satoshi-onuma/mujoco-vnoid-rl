@@ -131,14 +131,21 @@ public:
         return py::array_t<double>(obs.size(), obs.data());
     }
 
-    double compute_reward() {
-        double current_x = d->qpos[0];
-        double forward_reward = current_x - previous_x;
-        previous_x = current_x;
-        
-        double healthy_reward = 1.0;
-        return forward_reward * 5.0 + healthy_reward;
-    }
+   double compute_reward() {
+    double current_x = d->qpos[0];
+    double forward_reward = current_x - previous_x;
+    double healthy_reward = 1.0;
+    double total_reward = forward_reward * 5.0 + healthy_reward;
+    
+    // ★デバッグログ
+    std::cout << "[REWARD] current_x=" << current_x 
+              << " | prev_x=" << previous_x 
+              << " | forward=" << forward_reward 
+              << " | total=" << total_reward << std::endl;
+    
+    previous_x = current_x;
+    return total_reward;
+}
 
     // コピー・ムーブを禁止
     VnoidEnv(const VnoidEnv&) = delete;
