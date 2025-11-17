@@ -26,13 +26,14 @@ print("=" * 70)
 # Ray初期化
 ray.init(logging_level="ERROR")
 
-# 学習用環境を登録（OpenGL不使用）
-tune.register_env("HumanoidVnoid-v0", lambda config: HumanoidVnoidEnv(enable_rendering=False))
+
 
 # PPO設定
 config = (
     PPOConfig()
-    .environment(env="HumanoidVnoid-v0")
+    .environment(env="HumanoidVnoid-v0",
+                 env_config={"enable_rendering": False}  # ★ 描画なし
+                 )
     .env_runners(
         num_env_runners=NUM_WORKERS,
         rollout_fragment_length=50,  # ★ 適度な長さ

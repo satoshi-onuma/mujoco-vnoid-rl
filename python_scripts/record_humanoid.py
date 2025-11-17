@@ -4,11 +4,13 @@ import os
 import gymnasium as gym
 import ray
 from ray.rllib.algorithms.algorithm import Algorithm
-import torch
 import numpy as np
 import imageio
-from ray.rllib.models.torch.torch_distributions import TorchDiagGaussian
 from ray import tune
+import torch
+from ray.rllib.core.rl_module import RLModule
+from pathlib import Path
+from pprint import pprint
 
 from my_humanoid_env import HumanoidVnoidEnv
 
@@ -21,7 +23,6 @@ OUTPUT_FPS = 30       # 出力動画のFPS
 TOTAL_STEPS = 500    # 録画するステップ数
 
 print("設定:")
-print("  - 制御周波数: 60fps (sample_controller_mujocoと同じ)")
 print(f"  - 出力FPS: {OUTPUT_FPS}")
 print("  - 並列環境数: なし（単一環境）")
 print("  - OpenGL: 有効（録画のため）")
@@ -37,53 +38,34 @@ if not os.path.exists(checkpoint_dir):
     print("  python train_humanoid.py")
     exit(1)
 
-print(f"\n📂 チェックポイント: {checkpoint_dir}")
-
-# Ray初期化
-print("\n🔧 Ray初期化中...")
-ray.init(
-    logging_level="ERROR",
-    ignore_reinit_error=True,
+# ★ os.path.join()でパスを結合
+rl_module_path = os.path.join(
+    checkpoint_dir,
+    "learner_group",
+    "learner",
+    "rl_module",
+    "default_policy"
 )
-print("✅ Ray初期化完了")
 
-# 録画用環境を登録（OpenGL使用）
-tune.register_env("HumanoidVnoidRecording-v0", 
-                  lambda config: HumanoidVnoidEnv(enable_rendering=True, render_mode="rgb_array"))
+print(f"\n📂 チェックポイント: {checkpoint_dir}")
+print(f"📦 RLModule パス: {rl_module_path}")
 
-# ★★★ 重要：学習時と同じ環境名も登録 ★★★
-tune.register_env("HumanoidVnoid-v0",
-                  lambda config: HumanoidVnoidEnv(enable_rendering=False))
 
 # 学習済みアルゴリズムをロード
 print("\n📥 学習済みポリシーをロード中...")
 try:
-    algo = Algorithm.from_checkpoint(
-        checkpoint_dir,
-        config_overrides={
-            "num_env_runners": 0,  # 並列環境を無効化
-            "num_gpus": 0,
-            "evaluation_config": {
-                "env_runners": {
-                    "num_env_runners": 0,
-                }
-            }
-        },
-    )
-    print("✅ ポリシーのロード完了")
+    rl_module = RLModule.from_checkpoint(rl_module_path)
+    print("\n📥 RLModuleをロード中...")
+    
 except Exception as e:
     print(f"❌ ポリシーのロード失敗: {e}")
-    ray.shutdown()
     exit(1)
 
 # 録画用環境を作成（OpenGL有効）
 print("\n🎬 録画環境を作成中...")
-env = gym.make("HumanoidVnoidRecording-v0")
+env = HumanoidVnoidEnv(enable_rendering=True, render_mode="rgb_array")
 obs, info = env.reset(seed=42)
 print("✅ 録画環境作成完了")
-
-# RLModuleを取得
-module = algo.get_module("default_policy")
 
 # フレームバッファ
 frames = []
@@ -97,25 +79,25 @@ try:
         if i < 2:
             action = np.zeros(5)  # 何もしない
         else:
-            # 観測をテンソルに変換
-            obs_tensor = torch.as_tensor(obs, dtype=torch.float32).unsqueeze(0)
-        
-            # 推論
+             # ★ Rayで推論（explore=Falseで決定的行動）
+            obs_batch = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)
+             # 推論（勾配計算不要）
             with torch.no_grad():
-                fwd_outs = module.forward_inference({"obs": obs_tensor})
-        
-            # アクション決定
-            action_dist = TorchDiagGaussian.from_logits(fwd_outs["action_dist_inputs"])
-            action_tensor = action_dist.sample()
-            action = action_tensor[0].cpu().numpy()
-        
-        # ステップ実行
-        obs, reward, terminated, truncated, info = env.step(action)
+                model_outputs = rl_module.forward_inference({"obs": obs_batch})
+            
+            action_dist_params = model_outputs["action_dist_inputs"][0].numpy()
 
-        # フレーム取得
-        frame = env.render()
-        if frame is not None:
-            frames.append(frame)
+            action = np.clip(
+                action_dist_params[:5],  # 0=mean, 1=log(stddev), [0:1]=use mean, but keep shape=(1,)
+                a_min=env.action_space.low,
+                a_max=env.action_space.high,
+            )
+            
+        # ステップ実行
+        obs, reward, terminated, truncated, info , step_frames= env.step(action)
+
+        # ★ 取得したフレームを全て追加
+        frames.extend(step_frames)
 
         # エピソード終了時にリセット
         if terminated or truncated:
@@ -133,7 +115,6 @@ except Exception as e:
 finally:
     print("-" * 70)
     env.close()
-    ray.shutdown()
 
 # 動画保存
 output_path = "humanoid_demo.mp4"

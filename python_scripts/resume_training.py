@@ -22,12 +22,17 @@ print(f"📂 チェックポイント: {checkpoint_dir}")
 # Ray初期化
 ray.init(logging_level="ERROR")
 
-# 環境登録
-tune.register_env("HumanoidVnoid-v0", lambda config: HumanoidVnoidEnv(enable_rendering=False))
-
 # チェックポイントからアルゴリズムをロード
 print("\n📥 チェックポイントをロード中...")
-algo = Algorithm.from_checkpoint(checkpoint_dir)
+NUM_WORKERS = 8 # ← お好みの並列数
+
+algo = Algorithm.from_checkpoint(
+    checkpoint_dir,
+    config_overrides={
+        "num_env_runners": NUM_WORKERS,  # 並列数を上書き
+    }
+)
+print(f"並列数:")
 print("✅ ロード完了")
 
 # 学習再開
@@ -45,6 +50,8 @@ for i in range(NUM_ADDITIONAL_ITERATIONS):
         reward_min = result["env_runners"]["episode_return_min"]
         reward_max = result["env_runners"]["episode_return_max"]
         num_episodes = result["env_runners"]["num_episodes"]
+        episode_len_mean = result["env_runners"]["episode_len_mean"]
+        
     except KeyError:
         reward_mean = 0.0
         reward_min=0.0
@@ -56,6 +63,7 @@ for i in range(NUM_ADDITIONAL_ITERATIONS):
     print(f"episode_return_min {reward_min:8.2f}")
     print(f"episode_return_max {reward_max:8.2f}")
     print(f"num_episodes {num_episodes:8.2f}")
+    print(f"  episode_len_mean: {episode_len_mean:.2f}")
     
 
 print("-" * 70)

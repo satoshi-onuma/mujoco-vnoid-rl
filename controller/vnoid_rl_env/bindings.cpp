@@ -80,7 +80,6 @@ public:
         robot = std::make_unique<MyRobot>();
         robot->Init(m, d);
         
-        // ★★★ sample_controller_mujocoと同じ60fps制御 ★★★
         // 1/60秒 = 0.01667秒をシミュレーション時間で進める
         const double render_period = 1.0 / 60.0;  // 60fps
         frame_skip = static_cast<int>(render_period / m->opt.timestep);
@@ -131,21 +130,25 @@ public:
         return py::array_t<double>(obs.size(), obs.data());
     }
 
-   double compute_reward() {
-    double current_x = d->qpos[0];
-    double forward_reward = current_x - previous_x;
-    double healthy_reward = 1.0;
-    double total_reward = forward_reward * 5.0 + healthy_reward;
+    double compute_reward() {
+        double current_x = d->qpos[0];
+        double forward_reward = current_x - previous_x;
+        double healthy_reward = 1.0;
+        double total_reward = forward_reward * 5.0 + healthy_reward;
     
-    // ★デバッグログ
-    std::cout << "[REWARD] current_x=" << current_x 
-              << " | prev_x=" << previous_x 
-              << " | forward=" << forward_reward 
-              << " | total=" << total_reward << std::endl;
+        // ★デバッグログ
+        std::cout << "[REWARD] current_x=" << current_x 
+                 << " | prev_x=" << previous_x 
+                << " | forward=" << forward_reward 
+                 << " | total=" << total_reward << std::endl;
+
+        //ここで返してるトータルリワードとPython側で受け取ってるRewardの値が若干違う
+        //並列環境減らすなどして試す
+        //現時点では50stepで終わってないほうが凶悪
     
-    previous_x = current_x;
-    return total_reward;
-}
+        previous_x = current_x;
+        return total_reward;
+    }
 
     // コピー・ムーブを禁止
     VnoidEnv(const VnoidEnv&) = delete;
@@ -199,7 +202,7 @@ private:
         mjv_defaultCamera(&cam);
         mjv_defaultOption(&opt);
         mjv_defaultScene(&scn);     // ← これが足りない！
-mjr_defaultContext(&con);
+        mjr_defaultContext(&con);
         
         // create scene and context (sample_controller_mujocoと同じ)
         mjv_makeScene(m, &scn, 2000);
@@ -252,32 +255,33 @@ mjr_defaultContext(&con);
 
 public:
     py::array_t<double> reset() {
-    if (!initialized) {
-        throw std::runtime_error("環境が初期化されていません。");
+        if (!initialized) {
+            throw std::runtime_error("環境が初期化されていません。");
+        }
+    
+        // データを完全に削除して再作成
+        mj_deleteData(d);
+        d = mj_makeData(m);
+    
+        // ロボットも完全に再初期化
+        robot = std::make_unique<MyRobot>();
+        robot->Init(m, d);
+    
+        mj_forward(m, d);
+        previous_x = d->qpos[0];
+        //並列環境で変数が共有されてる？
+    
+        return get_observation();
     }
-    
-    // データを完全に削除して再作成
-    mj_deleteData(d);
-    d = mj_makeData(m);
-    
-    // ロボットも完全に再初期化
-    robot = std::make_unique<MyRobot>();
-    robot->Init(m, d);
-    
-    mj_forward(m, d);
-    previous_x = d->qpos[0];
-    
-    return get_observation();
-}
 
     py::tuple step(py::array_t<double> action) {
         if (!initialized) {
             throw std::runtime_error("環境が初期化されていません。");
         }
          // ★★★ デバッグ用のログ出力を追加 ★★★
-    // どのプロセスがstepを呼び出したか確認
-    // C++11のスレッドIDを使って、簡易的にワーカーを識別
-    std::cout << "[Worker " << std::this_thread::get_id() << "] Python step() called." << std::endl;
+        // どのプロセスがstepを呼び出したか確認
+        // C++11のスレッドIDを使って、簡易的にワーカーを識別
+        std::cout << "[Worker " << std::this_thread::get_id() << "] Python step() called." << std::endl;
         
         auto buf = action.request();
         if (buf.ndim != 1 || buf.size < 5) {
@@ -298,12 +302,15 @@ public:
 
         bool step_completed = false;
         int prev_support_leg = robot->footstep_buffer.steps[0].side;
+        //並列環境で変数が共有されてる？
         int step_counter = 0;
 
         const int MAX_ITERATIONS = 1000;
         const double MIN_HEIGHT = 0.5;
         bool terminated = false;
         bool timeout = false;
+
+        std::vector<py::array_t<unsigned char>> frame_list;
 
         // ★★★ sample_controller_mujocoと同じ制御パターン ★★★
         while (!step_completed && !terminated) {
@@ -327,9 +334,16 @@ public:
             // レンダリング更新（既存コードと同じ）
             if (rendering_enabled && !glfwWindowShouldClose(window)) {
                 updateDisplay();
+
+                //ここで直接描画
+                try {
+                    frame_list.push_back(render());
+                } catch (const std::exception& e) {
+                    std::cerr << "[WARNING] Frame capture failed: " << e.what() << std::endl;
+                }
             }
         
-            // ★ 1歩完了を検出
+            // 1歩完了を検出
             int current_support_leg = robot->footstep_buffer.steps[0].side;
             step_completed = (current_support_leg != prev_support_leg);
         
@@ -346,9 +360,6 @@ public:
                 std::cerr << "[WARNING] Step timeout" << std::endl;
                 break;
             }
-    
-        
-        
         }
 
         if (step_completed && !terminated) {
@@ -362,8 +373,10 @@ public:
             reward = -10.0;
         }
         
-            return py::make_tuple(obs, reward, terminated, py::dict());
-        }
+        return py::make_tuple(obs, reward, terminated, py::dict(),frame_list);
+    }
+
+    
 
     // ★★★ sample_controller_mujocoと同じ表示更新 ★★★
     void updateDisplay() {
@@ -490,8 +503,5 @@ PYBIND11_MODULE(vnoid_rl_env, m) {
         .def(py::init<const std::string&, bool>())  // レンダリング有効化オプション
         .def("step", &VnoidEnv::step)
         .def("reset", &VnoidEnv::reset)
-        .def("render", &VnoidEnv::render)
-        .def("update_display", &VnoidEnv::updateDisplay)
         .def("should_close", &VnoidEnv::should_close)
-        .def("is_rendering_enabled", &VnoidEnv::is_rendering_enabled);
 }

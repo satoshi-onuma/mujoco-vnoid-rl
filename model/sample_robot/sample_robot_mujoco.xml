@@ -43,7 +43,7 @@
   </default>
 
   <worldbody>
-    <geom name="floor" size="0 0 .05" type="plane" material="grid" condim="3" conaffinity="1"/>
+    <geom name="floor" size="0 0 .05" type="plane" material="grid" condim="3" conaffinity="1" friction="0.01" solref="0.1 100" />
     <light name="spotlight" mode="targetbodycom" target="HIPS" diffuse=".8 .8 .8" specular="0.3 0.3 0.3" pos="0 -6 4" cutoff="30"/>
     <body name="HIPS" pos="0 0 0.9">
       <freejoint name="root"/>

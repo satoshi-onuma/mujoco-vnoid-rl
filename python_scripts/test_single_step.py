@@ -31,13 +31,7 @@ episode_counter=0
 for i in range(10):
     # ランダムアクション
     
-    action = np.array([
-         np.random.uniform(-1.0, 1.0),  # foot_offset_x
-         np.random.uniform(-1.0, 1.0),  # foot_offset_y
-         np.random.uniform(-1.0, 1.0),  # foot_angle_roll
-         np.random.uniform(-1.0, 1.0),  # foot_angle_pitch
-         np.random.uniform(-1.0, 1.0),  # foot_angle_yaw これないかも
-     ])
+    action = env.action_space.sample()
     
     
     print(f"\nステップ {i+1}:")

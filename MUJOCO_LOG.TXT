@@ -214,3 +214,18 @@ ERROR: OpenGL ARB_framebuffer_object required
 Mon Sep 29 19:22:27 2025
 ERROR: OpenGL ARB_framebuffer_object required
 
+Thu Nov 13 15:02:45 2025
+ERROR: Load model error: XML Error: Schema violation: unrecognized attribute: 'solimplimit'
+Element 'geom', line 46
+
+
+Thu Nov 13 15:03:23 2025
+ERROR: Load model error: XML Error: Schema violation: unrecognized attribute: 'solimplimit'
+Element 'geom', line 46
+
+
+Thu Nov 13 15:03:38 2025
+ERROR: Load model error: XML Error: Schema violation: unrecognized attribute: 'solimplimit'
+Element 'geom', line 46
+
+
