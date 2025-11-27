@@ -12,14 +12,7 @@ void RobotMujoco::Init(mjModel* _m, mjData* _d, const Param& param, Timer& timer
     m   = _m;
     d   = _d;
 
-	// ★★★ 診断情報を追加 ★★★
-    printf("=== MuJoCo vs vnoid 関節数診断 ===\n");
-    printf("MuJoCo nq (qpos size): %d\n", m->nq);
-    printf("MuJoCo nv (qvel size): %d\n", m->nv); 
-    printf("MuJoCo nu (ctrl size): %d\n", m->nu);
-    printf("vnoid joint size: %d\n", (int)joint.size());
-    printf("=====================================\n");
-    
+
     joint_pos_filter.resize(joint.size());
 	for (int i = 0; i < joint.size(); ++i) {
 		joint[i].q_ref  = joint[i].q  = d->qpos[7+i];
@@ -60,7 +53,6 @@ void RobotMujoco::Sense(Timer& timer, Base& base, vector<Joint>& joint){
 	base.acc[0] = acc_filter[0](gyro_axis_x.dot(a), timer.dt);
 	base.acc[1] = acc_filter[1](gyro_axis_y.dot(a), timer.dt);
 	base.acc[2] = acc_filter[2](gyro_axis_z.dot(a), timer.dt);
-
     Vector3 w(d->sensordata[idx+0], d->sensordata[idx+1], d->sensordata[idx+2]); idx += 3;
     base.angvel[0] = gyro_filter[0](gyro_axis_x.dot(w), timer.dt);
     base.angvel[1] = gyro_filter[1](gyro_axis_y.dot(w), timer.dt);

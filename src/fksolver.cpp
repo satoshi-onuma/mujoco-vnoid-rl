@@ -113,7 +113,7 @@ void FkSolver::Comp(const Param& param, const vector<Joint>& joint, const Base& 
         for(int j = 0; j < 7; j++){
             q[j] = joint[param.arm_joint_index[i] + j].q;
         }
-
+ 
         CompArmFk(param.upper_arm_length, param.lower_arm_length, q, &arm_pos[i][0], &arm_ori[i][0], &arm_axis[i][0]);
 
         hand[i].ori   = base.ori*arm_ori[i][6];

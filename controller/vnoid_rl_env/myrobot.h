@@ -7,6 +7,7 @@
 #include "footstep_planner.h"
 #include "stepping_controller.h"
 #include "stabilizer.h"
+#include "types.h"
 
 namespace cnoid{
 namespace vnoid{

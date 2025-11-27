@@ -1,5 +1,3 @@
-// ★★★ sample_controller_mujocoベース：インタラクティブ表示版 ★★★
-
 #include <pybind11/pybind11.h>
 #include <pybind11/numpy.h>
 #include <pybind11/stl.h>
@@ -10,6 +8,8 @@
 #include <stdexcept>
 #include <iostream>
 #include <thread>
+#include "matplotlibcpp.h"
+namespace plt = matplotlibcpp;
 
 namespace py = pybind11;
 using namespace cnoid::vnoid;
@@ -56,6 +56,49 @@ private:
     bool scene_initialized = false;
     bool context_initialized = false;
 
+    struct ControlLog {
+        std::vector<double> time;
+        
+        // 実測値
+        std::vector<double> com_pos_x, com_pos_y, com_pos_z;
+        std::vector<double> com_vel_x, com_vel_y, com_vel_z;
+        std::vector<double> zmp_x, zmp_y, zmp_z;
+        std::vector<double> dcm_x, dcm_y, dcm_z;
+        
+        // 目標値
+        std::vector<double> com_pos_ref_x, com_pos_ref_y, com_pos_ref_z;
+        std::vector<double> zmp_ref_x, zmp_ref_y, zmp_ref_z;
+        std::vector<double> dcm_ref_x, dcm_ref_y, dcm_ref_z;
+        
+        void clear() {
+            time.clear();
+            com_pos_x.clear(); com_pos_y.clear(); com_pos_z.clear();
+            com_vel_x.clear(); com_vel_y.clear(); com_vel_z.clear();
+            zmp_x.clear(); zmp_y.clear(); zmp_z.clear();
+            dcm_x.clear(); dcm_y.clear(); dcm_z.clear();
+            com_pos_ref_x.clear(); com_pos_ref_y.clear(); com_pos_ref_z.clear();
+            zmp_ref_x.clear(); zmp_ref_y.clear(); zmp_ref_z.clear();
+            dcm_ref_x.clear(); dcm_ref_y.clear(); dcm_ref_z.clear();
+        }
+        
+        void reserve(size_t n) {
+            time.reserve(n);
+            com_pos_x.reserve(n); com_pos_y.reserve(n); com_pos_z.reserve(n);
+            com_vel_x.reserve(n); com_vel_y.reserve(n); com_vel_z.reserve(n);
+            zmp_x.reserve(n); zmp_y.reserve(n); zmp_z.reserve(n);
+            dcm_x.reserve(n); dcm_y.reserve(n); dcm_z.reserve(n);
+            com_pos_ref_x.reserve(n); com_pos_ref_y.reserve(n); com_pos_ref_z.reserve(n);
+            zmp_ref_x.reserve(n); zmp_ref_y.reserve(n); zmp_ref_z.reserve(n);
+            dcm_ref_x.reserve(n); dcm_ref_y.reserve(n); dcm_ref_z.reserve(n);
+        }
+    };
+
+    ControlLog control_log;
+
+    Vector3 prev_com_pos;
+    Vector3 com_vel_actual;
+    bool first_step = true;
+
 public:
     
 
@@ -87,12 +130,19 @@ public:
         std::cout << "フレームスキップ設定: " << frame_skip 
                   << " (60fps制御, MuJoCo timestep=" << m->opt.timestep << "秒)" << std::endl;
         
-        // ★★★ レンダリングが有効な場合のみOpenGL初期化 ★★★
+        // ★★★ レンダリングが有効な場合のみOpenGL初期化 ★★★ログも初期化
         if (rendering_enabled) {
+
+            control_log.clear();
+            control_log.reserve(100000);
+            std::cout << "📊 制御データのロギング自動開始" << std::endl;
+
             try {
                 initializeGLFW();
                 initializeRenderer();
                 std::cout << "✅ OpenGL初期化成功" << std::endl;
+                
+                
             } catch (const std::exception& e) {
                 std::cerr << "⚠️ OpenGL初期化失敗: " << e.what() << std::endl;
                 std::cerr << "⚠️ レンダリングを無効化して続行します" << std::endl;
@@ -112,21 +162,65 @@ public:
         
         initialized = true;
         previous_x = d->qpos[0];
+
+        prev_com_pos = Vector3(0.0, 0.0, 0.0);
+        com_vel_actual = Vector3(0.0, 0.0, 0.0);
+        first_step = true;
         
         std::cout << "✅ VnoidEnv初期化完了" << std::endl;
     }
 
     ~VnoidEnv() {
+
+        if (rendering_enabled &&!control_log.time.empty()) {
+            try {
+                generate_plots();
+            } catch (const std::exception& e) {
+                std::cerr << "⚠️ グラフ生成エラー: " << e.what() << std::endl;
+            }
+        }
         cleanup();
     }
 
     py::array_t<double> get_observation() {
         std::vector<double> obs;
-        obs.reserve(m->nq + m->nv);
         
-        for (int i = 0; i < m->nq; ++i) obs.push_back(d->qpos[i]);
-        for (int i = 0; i < m->nv; ++i) obs.push_back(d->qvel[i]);
+        obs.push_back(robot->base.angvel[0]);
+        obs.push_back(robot->base.angvel[1]);
+        obs.push_back(robot->base.angvel[2]);
+
+        obs.push_back(robot->base.ori.w()); 
+        obs.push_back(robot->base.ori.x()); 
+        obs.push_back(robot->base.ori.y()); 
+        obs.push_back(robot->base.ori.z()); 
+
+        obs.push_back(robot->base.acc[0]);    // 加速度
+        obs.push_back(robot->base.acc[1]);
+        obs.push_back(robot->base.acc[2]);
         
+        obs.push_back(robot->foot[0].contact_ref ? 1.0 : 0.0);
+        obs.push_back(robot->foot[1].contact_ref ? 1.0 : 0.0);
+
+        obs.push_back(robot->foot[0].pos_ref[2]);
+        obs.push_back(robot->foot[1].pos_ref[2]);
+
+        double left_foot_sink = robot->foot[0].pos[2] - robot->foot[0].pos_ref[2]  ;//実測-予測　予想より下にいたら-,上にいたら+
+        double right_foot_sink = robot->foot[0].pos[2] - robot->foot[1].pos_ref[2] ;//実測足の位置使っているのでここだけジャイロ以外使用
+
+        obs.push_back(left_foot_sink); 
+        obs.push_back(right_foot_sink); 
+
+        /*
+        DCMの修正した大きさを入れる　デルタ入れたらいい?
+        Vector3 dcm_error = centroid.dcm_ref - centroid.dcm_target;
+        obs.push_back(dcm_error[0]);
+        obs.push_back(dcm_error[1]);
+        */
+        
+
+
+        //設計思想に合わせて追加
+    
         return py::array_t<double>(obs.size(), obs.data());
     }
 
@@ -161,6 +255,172 @@ public:
     mjvScene* GetScene() { return &scn; }
 
 private:
+
+
+    // ★ CoM速度を数値微分で計算
+    Vector3 calc_com_velocity() {
+        if (!robot) {
+            return Vector3(0.0, 0.0, 0.0);
+        }
+        
+        Vector3 current_com_pos = robot->centroid.com_pos;
+        
+        if (first_step) {
+            // 初回は速度ゼロ
+            prev_com_pos = current_com_pos;
+            com_vel_actual = Vector3(0.0, 0.0, 0.0);
+            first_step = false;
+        } else {
+            // 数値微分： v = (x[t] - x[t-1]) / dt
+            double dt = robot->timer.dt;
+            if (dt > 1e-10) {  // ゼロ除算回避
+                com_vel_actual = (current_com_pos - prev_com_pos) / dt;
+            }
+            prev_com_pos = current_com_pos;
+        }
+        
+        return com_vel_actual;
+    }
+
+    Vector3 calc_dcm_actual() {
+        // DCM = CoM_pos + T * CoM_vel
+        // T = sqrt(h/g) はLIPMの時定数
+        double T = robot->param.T;
+        Vector3 com_vel = calc_com_velocity();
+        return robot->centroid.com_pos + T * com_vel;
+        // Note: com_velの実測値がない場合はcom_vel_refを使う
+        // より正確にはFK計算からcom_velを取得すべき
+    }
+
+    void log_control_data() {
+        if (!rendering_enabled|| !robot) return;
+        
+        // CoM速度を計算（キャッシュされる）
+        Vector3 com_vel = calc_com_velocity();
+
+        // DCM実測値を計算
+        Vector3 dcm_actual = calc_dcm_actual();
+        
+        control_log.time.push_back(robot->timer.time);
+        
+        // 実測値
+        control_log.com_pos_x.push_back(robot->centroid.com_pos.x());
+        control_log.com_pos_y.push_back(robot->centroid.com_pos.y());
+        control_log.com_pos_z.push_back(robot->centroid.com_pos.z());
+        control_log.com_vel_x.push_back(com_vel.x());
+        control_log.com_vel_y.push_back(com_vel.y());
+        control_log.com_vel_z.push_back(com_vel.z());
+        control_log.zmp_x.push_back(robot->centroid.zmp.x());
+        control_log.zmp_y.push_back(robot->centroid.zmp.y());
+        control_log.zmp_z.push_back(robot->centroid.zmp.z());
+        control_log.dcm_x.push_back(dcm_actual.x());
+        control_log.dcm_y.push_back(dcm_actual.y());
+        control_log.dcm_z.push_back(dcm_actual.z());
+        
+        // 目標値
+        control_log.com_pos_ref_x.push_back(robot->centroid.com_pos_ref.x());
+        control_log.com_pos_ref_y.push_back(robot->centroid.com_pos_ref.y());
+        control_log.com_pos_ref_z.push_back(robot->centroid.com_pos_ref.z());
+        control_log.zmp_ref_x.push_back(robot->centroid.zmp_ref.x());
+        control_log.zmp_ref_y.push_back(robot->centroid.zmp_ref.y());
+        control_log.zmp_ref_z.push_back(robot->centroid.zmp_ref.z());
+        control_log.dcm_ref_x.push_back(robot->centroid.dcm_ref.x());
+        control_log.dcm_ref_y.push_back(robot->centroid.dcm_ref.y());
+        control_log.dcm_ref_z.push_back(robot->centroid.dcm_ref.z());
+    }
+
+    // ★ グラフ生成（C++のみで完結）
+    void generate_plots() {
+
+        if (control_log.time.empty()) {
+        std::cout << "⚠️ ログデータが空です" << std::endl;
+        return;
+    }
+        std::cout << "\n📊 グラフ生成中..." << std::endl;
+
+        plt::backend("Agg");  // ★ この1行を最初に追加
+        
+        // 6パネルのグラフ
+        plt::figure_size(1500, 1000);
+        
+        // --- パネル1: CoM Position ---
+        plt::subplot(3, 2, 1);
+        plt::named_plot("Actual X", control_log.time, control_log.com_pos_x, "r-");
+        plt::named_plot("Ref X", control_log.time, control_log.com_pos_ref_x, "r--");
+        plt::named_plot("Actual Y", control_log.time, control_log.com_pos_y, "g-");
+        plt::named_plot("Ref Y", control_log.time, control_log.com_pos_ref_y, "g--");
+        plt::named_plot("Actual Z", control_log.time, control_log.com_pos_z, "b-");
+        plt::named_plot("Ref Z", control_log.time, control_log.com_pos_ref_z, "b--");
+        plt::xlabel("Time [s]");
+        plt::ylabel("Position [m]");
+        plt::title("CoM Position");
+        plt::legend();
+        plt::grid(true);
+        
+        // --- パネル2: CoM Velocity ---
+        plt::subplot(3, 2, 2);
+        plt::named_plot("X", control_log.time, control_log.com_vel_x, "r-");
+        plt::named_plot("Y", control_log.time, control_log.com_vel_y, "g-");
+        plt::named_plot("Z", control_log.time, control_log.com_vel_z, "b-");
+        plt::xlabel("Time [s]");
+        plt::ylabel("Velocity [m/s]");
+        plt::title("CoM Velocity");
+        plt::legend();
+        plt::grid(true);
+        
+        // --- パネル3: ZMP ---
+        plt::subplot(3, 2, 3);
+        plt::named_plot("Actual X", control_log.time, control_log.zmp_x, "r-");
+        plt::named_plot("Ref X", control_log.time, control_log.zmp_ref_x, "r--");
+        plt::named_plot("Actual Y", control_log.time, control_log.zmp_y, "g-");
+        plt::named_plot("Ref Y", control_log.time, control_log.zmp_ref_y, "g--");
+        plt::xlabel("Time [s]");
+        plt::ylabel("Position [m]");
+        plt::title("ZMP (Zero Moment Point)");
+        plt::legend();
+        plt::grid(true);
+        
+        // --- パネル4: DCM ---
+        plt::subplot(3, 2, 4);
+        plt::named_plot("Actual X", control_log.time, control_log.dcm_x, "r-");
+        plt::named_plot("Ref X", control_log.time, control_log.dcm_ref_x, "r--");
+        plt::named_plot("Actual Y", control_log.time, control_log.dcm_y, "g-");
+        plt::named_plot("Ref Y", control_log.time, control_log.dcm_ref_y, "g--");
+        plt::xlabel("Time [s]");
+        plt::ylabel("Position [m]");
+        plt::title("DCM (Divergent Component of Motion)");
+        plt::legend();
+        plt::grid(true);
+        
+        // --- パネル5: CoM Trajectory (XY平面) ---
+        plt::subplot(3, 2, 5);
+        plt::named_plot("Actual", control_log.com_pos_x, control_log.com_pos_y, "b-");
+        plt::named_plot("Ref", control_log.com_pos_ref_x, control_log.com_pos_ref_y, "b--");
+        plt::plot({control_log.com_pos_x[0]}, {control_log.com_pos_y[0]}, "go");  // Start
+        plt::plot({control_log.com_pos_x.back()}, {control_log.com_pos_y.back()}, "rx");  // End
+        plt::xlabel("X [m]");
+        plt::ylabel("Y [m]");
+        plt::title("CoM Trajectory (Top View)");
+        plt::legend();
+        plt::grid(true);
+        
+        // --- パネル6: ZMP & DCM Trajectory (XY平面) ---
+        plt::subplot(3, 2, 6);
+        plt::named_plot("ZMP Actual", control_log.zmp_x, control_log.zmp_y, "r-");
+        plt::named_plot("ZMP Ref", control_log.zmp_ref_x, control_log.zmp_ref_y, "r--");
+        plt::named_plot("DCM Actual", control_log.dcm_x, control_log.dcm_y, "b-");
+        plt::named_plot("DCM Ref", control_log.dcm_ref_x, control_log.dcm_ref_y, "b--");
+        plt::xlabel("X [m]");
+        plt::ylabel("Y [m]");
+        plt::title("ZMP & DCM Trajectory (Top View)");
+        plt::legend();
+        plt::grid(true);
+        
+        // 保存
+        plt::save("control_analysis.png");
+        std::cout << "✅ グラフ保存完了: control_analysis.png (" 
+                  << control_log.time.size() << " サンプル)" << std::endl;
+    }
     
 
     void initializeRobot() {
@@ -270,6 +530,11 @@ public:
         mj_forward(m, d);
         previous_x = d->qpos[0];
         //並列環境で変数が共有されてる？
+
+        // ★ CoM速度計算をリセット
+        first_step = true;
+        prev_com_pos = Vector3(0.0, 0.0, 0.0);
+        com_vel_actual = Vector3(0.0, 0.0, 0.0);
     
         return get_observation();
     }
@@ -292,13 +557,11 @@ public:
         RLParams rl_params;
          
         // actionから設定
-        rl_params.foot_offset.x() = ptr[0];
-        rl_params.foot_offset.y() = ptr[1];
-        rl_params.foot_angle_offset.x() = ptr[2];
-        rl_params.foot_angle_offset.y() = ptr[3];
-        rl_params.foot_angle_offset.z() = ptr[4];
-
-        
+        rl_params.stride_offset = ptr[0];
+        rl_params.turn_offset = ptr[1];
+        rl_params.spacing_offset = ptr[2];
+        rl_params.climb_offset = ptr[3];
+        rl_params.duration_offset = ptr[4];
 
         bool step_completed = false;
         int prev_support_leg = robot->footstep_buffer.steps[0].side;
@@ -326,6 +589,9 @@ public:
                     std::cout << "[INFO] Robot fell (height=" << hips_z << ")" << std::endl;
                     break;
                 }
+
+                // ★ 毎制御サイクルでログ記録
+                log_control_data();
                 
             }
 
@@ -404,6 +670,13 @@ public:
         }
         
         try {
+
+            // カメラをロボットに追従させる、必要ないときは消せ
+            cam.lookat[0] = d->qpos[0];  // X座標
+            cam.lookat[1] = d->qpos[1];  // Y座標
+            cam.lookat[2] = d->qpos[2];  // Z座標
+
+
             // 録画用の固定ビューポート
             mjrRect viewport = {0, 0, 1280, 720};
             
@@ -503,5 +776,5 @@ PYBIND11_MODULE(vnoid_rl_env, m) {
         .def(py::init<const std::string&, bool>())  // レンダリング有効化オプション
         .def("step", &VnoidEnv::step)
         .def("reset", &VnoidEnv::reset)
-        .def("should_close", &VnoidEnv::should_close)
+        .def("should_close", &VnoidEnv::should_close);
 }

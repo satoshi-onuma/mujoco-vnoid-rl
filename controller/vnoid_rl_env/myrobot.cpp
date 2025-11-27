@@ -155,10 +155,6 @@ void MyRobot::Init(mjModel* _m, mjData* _d){
     stabilizer.dcm_ctrl_gain           = 2.0;
     
 }
-
-
-
-
 void MyRobot::Control(const RLParams& rl_params){ // ★引数を追加
     if(timer.count % param.control_cycle == 0){    
         RobotMujoco::Sense(timer, base, foot, joint);
@@ -172,11 +168,11 @@ void MyRobot::Control(const RLParams& rl_params){ // ★引数を追加
 			    footstep.steps.pop_back();
 
 		    Step step;
-	        step.stride   = 0.1;
-	        step.turn     = 0.0;
-	        step.spacing  = 0.2;
-	        step.climb    = 0.0;
-	        step.duration = 0.4;
+	        step.stride   = 0.1 + rl_params.stride_offset;
+	        step.turn     = 0.0 + rl_params.turn_offset;
+	        step.spacing  = 0.2 + rl_params.spacing_offset;
+	        step.climb    = 0.0 + rl_params.climb_offset;
+	        step.duration = 0.4 + rl_params.duration_offset;
 	        footstep.steps.push_back(step);
 	        footstep.steps.push_back(step);
 	        footstep.steps.push_back(step);
@@ -186,8 +182,7 @@ void MyRobot::Control(const RLParams& rl_params){ // ★引数を追加
             footstep_planner.GenerateDCM(param, footstep);
 	    }
 
-        // ★ 常にrl_paramsを使う（1歩の間は同じ値が渡される前提）
-        stepping_controller.Update(timer, param, footstep, footstep_buffer,centroid, base, foot, rl_params);
+        stepping_controller.Update(timer, param, footstep, footstep_buffer,centroid, base, foot);
         // stabilizer performs balance feedback
         stabilizer         .Update(timer, param, centroid, base, foot);
     

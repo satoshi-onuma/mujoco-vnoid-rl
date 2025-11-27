@@ -9,6 +9,7 @@ include_directories("../../src")
 find_package(pybind11 REQUIRED)
 find_package(mujoco REQUIRED)
 find_package(glfw3 REQUIRED)
+find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 
 # Pythonがインポートできるモジュールとしてライブラリをビルド
 add_library(vnoid_rl_env MODULE bindings.cpp myrobot.cpp)
@@ -24,9 +25,15 @@ target_include_directories(vnoid_rl_env PUBLIC
     "."
 )
 
+target_include_directories(vnoid_rl_env PRIVATE
+    ${Python3_INCLUDE_DIRS}
+    ${CMAKE_SOURCE_DIR}/external/matplotlib-cpp
+)
+
 # リンク設定
 target_link_libraries(vnoid_rl_env PRIVATE
     vnoid_lib
     mujoco::mujoco
     glfw
+    Python3::Python    # ★ 追加
 )

@@ -87,11 +87,20 @@ try:
             
             action_dist_params = model_outputs["action_dist_inputs"][0].numpy()
 
+            
+            """
+            RL介入あり
+
             action = np.clip(
                 action_dist_params[:5],  # 0=mean, 1=log(stddev), [0:1]=use mean, but keep shape=(1,)
                 a_min=env.action_space.low,
                 a_max=env.action_space.high,
             )
+
+            RL介入なし
+            action = env.action_space.sample()
+            """
+            action = env.action_space.sample()
             
         # ステップ実行
         obs, reward, terminated, truncated, info , step_frames= env.step(action)
