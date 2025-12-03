@@ -38,12 +38,12 @@
 
   <default>
     <motor ctrlrange="-100 100" ctrllimited="true"/>
-    <geom condim="3" friction="0.2" solimp=".9 .99 .003" solref=".001 100" material="body" group="1"/>
+    <geom condim="3" friction="1" solimp=".9 .99 .003" solref=".001 100" material="body" group="1"/>
     <joint type="hinge" damping=".0" stiffness="0" armature=".01" limited="true" solimplimit="0 .99 .01"/>
   </default>
 
   <worldbody>
-    <geom name="floor" size="0 0 .05" type="plane" material="grid" condim="3" conaffinity="1"  solref="0.05 2" solimp=".7 .99 .003" />
+    <geom name="floor" size="0 0 .05" type="plane" material="grid" condim="3" conaffinity="1" friction="1" solref="0.1 2" solimp=".7 .85 .003" />
     <light name="spotlight" mode="targetbodycom" target="HIPS" diffuse=".8 .8 .8" specular="0.3 0.3 0.3" pos="0 -6 4" cutoff="30"/>
     <body name="HIPS" pos="0 0 0.9">
       <freejoint name="root"/>

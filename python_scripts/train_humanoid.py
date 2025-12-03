@@ -6,7 +6,8 @@ import ray
 from ray.rllib.algorithms.ppo import PPOConfig
 from ray import tune
 import matplotlib.pyplot as plt
-
+import matplotlib
+matplotlib.use('Agg')  # ★ GUIなしバックエンドを明示的に設定
 from my_humanoid_env import HumanoidVnoidEnv
 
 print("=" * 70)
@@ -103,8 +104,6 @@ plt.grid(True, alpha=0.3)
 plt.tight_layout()
 plt.savefig("training_curve.png", dpi=150)
 print(f"📊 学習曲線を保存: training_curve.png")
-
-plt.show()
 
 ray.shutdown()
 

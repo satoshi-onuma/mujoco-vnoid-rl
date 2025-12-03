@@ -8,8 +8,6 @@
 #include <stdexcept>
 #include <iostream>
 #include <thread>
-#include "matplotlibcpp.h"
-namespace plt = matplotlibcpp;
 
 namespace py = pybind11;
 using namespace cnoid::vnoid;
@@ -159,6 +157,7 @@ public:
                 }
             }
         }
+
         
         initialized = true;
         previous_x = d->qpos[0];
@@ -171,16 +170,48 @@ public:
     }
 
     ~VnoidEnv() {
-
-        if (rendering_enabled &&!control_log.time.empty()) {
-            try {
-                generate_plots();
-            } catch (const std::exception& e) {
-                std::cerr << "⚠️ グラフ生成エラー: " << e.what() << std::endl;
-            }
-        }
         cleanup();
     }
+
+
+        py::dict get_control_log() {
+        py::dict log;
+        
+        log["time"] = control_log.time;
+        
+        // 実測値
+        log["com_pos_x"] = control_log.com_pos_x;
+        log["com_pos_y"] = control_log.com_pos_y;
+        log["com_pos_z"] = control_log.com_pos_z;
+        log["com_vel_x"] = control_log.com_vel_x;
+        log["com_vel_y"] = control_log.com_vel_y;
+        log["com_vel_z"] = control_log.com_vel_z;
+        log["zmp_x"] = control_log.zmp_x;
+        log["zmp_y"] = control_log.zmp_y;
+        log["zmp_z"] = control_log.zmp_z;
+        log["dcm_x"] = control_log.dcm_x;
+        log["dcm_y"] = control_log.dcm_y;
+        log["dcm_z"] = control_log.dcm_z;
+        
+        // 目標値
+        log["com_pos_ref_x"] = control_log.com_pos_ref_x;
+        log["com_pos_ref_y"] = control_log.com_pos_ref_y;
+        log["com_pos_ref_z"] = control_log.com_pos_ref_z;
+        log["zmp_ref_x"] = control_log.zmp_ref_x;
+        log["zmp_ref_y"] = control_log.zmp_ref_y;
+        log["zmp_ref_z"] = control_log.zmp_ref_z;
+        log["dcm_ref_x"] = control_log.dcm_ref_x;
+        log["dcm_ref_y"] = control_log.dcm_ref_y;
+        log["dcm_ref_z"] = control_log.dcm_ref_z;
+        
+        return log;
+    }
+    
+    // ★ ログをクリアするメソッド
+    void clear_control_log() {
+        control_log.clear();
+    }
+
 
     py::array_t<double> get_observation() {
         std::vector<double> obs;
@@ -327,99 +358,6 @@ private:
         control_log.dcm_ref_x.push_back(robot->centroid.dcm_ref.x());
         control_log.dcm_ref_y.push_back(robot->centroid.dcm_ref.y());
         control_log.dcm_ref_z.push_back(robot->centroid.dcm_ref.z());
-    }
-
-    // ★ グラフ生成（C++のみで完結）
-    void generate_plots() {
-
-        if (control_log.time.empty()) {
-        std::cout << "⚠️ ログデータが空です" << std::endl;
-        return;
-    }
-        std::cout << "\n📊 グラフ生成中..." << std::endl;
-
-        plt::backend("Agg");  // ★ この1行を最初に追加
-        
-        // 6パネルのグラフ
-        plt::figure_size(1500, 1000);
-        
-        // --- パネル1: CoM Position ---
-        plt::subplot(3, 2, 1);
-        plt::named_plot("Actual X", control_log.time, control_log.com_pos_x, "r-");
-        plt::named_plot("Ref X", control_log.time, control_log.com_pos_ref_x, "r--");
-        plt::named_plot("Actual Y", control_log.time, control_log.com_pos_y, "g-");
-        plt::named_plot("Ref Y", control_log.time, control_log.com_pos_ref_y, "g--");
-        plt::named_plot("Actual Z", control_log.time, control_log.com_pos_z, "b-");
-        plt::named_plot("Ref Z", control_log.time, control_log.com_pos_ref_z, "b--");
-        plt::xlabel("Time [s]");
-        plt::ylabel("Position [m]");
-        plt::title("CoM Position");
-        plt::legend();
-        plt::grid(true);
-        
-        // --- パネル2: CoM Velocity ---
-        plt::subplot(3, 2, 2);
-        plt::named_plot("X", control_log.time, control_log.com_vel_x, "r-");
-        plt::named_plot("Y", control_log.time, control_log.com_vel_y, "g-");
-        plt::named_plot("Z", control_log.time, control_log.com_vel_z, "b-");
-        plt::xlabel("Time [s]");
-        plt::ylabel("Velocity [m/s]");
-        plt::title("CoM Velocity");
-        plt::legend();
-        plt::grid(true);
-        
-        // --- パネル3: ZMP ---
-        plt::subplot(3, 2, 3);
-        plt::named_plot("Actual X", control_log.time, control_log.zmp_x, "r-");
-        plt::named_plot("Ref X", control_log.time, control_log.zmp_ref_x, "r--");
-        plt::named_plot("Actual Y", control_log.time, control_log.zmp_y, "g-");
-        plt::named_plot("Ref Y", control_log.time, control_log.zmp_ref_y, "g--");
-        plt::xlabel("Time [s]");
-        plt::ylabel("Position [m]");
-        plt::title("ZMP (Zero Moment Point)");
-        plt::legend();
-        plt::grid(true);
-        
-        // --- パネル4: DCM ---
-        plt::subplot(3, 2, 4);
-        plt::named_plot("Actual X", control_log.time, control_log.dcm_x, "r-");
-        plt::named_plot("Ref X", control_log.time, control_log.dcm_ref_x, "r--");
-        plt::named_plot("Actual Y", control_log.time, control_log.dcm_y, "g-");
-        plt::named_plot("Ref Y", control_log.time, control_log.dcm_ref_y, "g--");
-        plt::xlabel("Time [s]");
-        plt::ylabel("Position [m]");
-        plt::title("DCM (Divergent Component of Motion)");
-        plt::legend();
-        plt::grid(true);
-        
-        // --- パネル5: CoM Trajectory (XY平面) ---
-        plt::subplot(3, 2, 5);
-        plt::named_plot("Actual", control_log.com_pos_x, control_log.com_pos_y, "b-");
-        plt::named_plot("Ref", control_log.com_pos_ref_x, control_log.com_pos_ref_y, "b--");
-        plt::plot({control_log.com_pos_x[0]}, {control_log.com_pos_y[0]}, "go");  // Start
-        plt::plot({control_log.com_pos_x.back()}, {control_log.com_pos_y.back()}, "rx");  // End
-        plt::xlabel("X [m]");
-        plt::ylabel("Y [m]");
-        plt::title("CoM Trajectory (Top View)");
-        plt::legend();
-        plt::grid(true);
-        
-        // --- パネル6: ZMP & DCM Trajectory (XY平面) ---
-        plt::subplot(3, 2, 6);
-        plt::named_plot("ZMP Actual", control_log.zmp_x, control_log.zmp_y, "r-");
-        plt::named_plot("ZMP Ref", control_log.zmp_ref_x, control_log.zmp_ref_y, "r--");
-        plt::named_plot("DCM Actual", control_log.dcm_x, control_log.dcm_y, "b-");
-        plt::named_plot("DCM Ref", control_log.dcm_ref_x, control_log.dcm_ref_y, "b--");
-        plt::xlabel("X [m]");
-        plt::ylabel("Y [m]");
-        plt::title("ZMP & DCM Trajectory (Top View)");
-        plt::legend();
-        plt::grid(true);
-        
-        // 保存
-        plt::save("control_analysis.png");
-        std::cout << "✅ グラフ保存完了: control_analysis.png (" 
-                  << control_log.time.size() << " サンプル)" << std::endl;
     }
     
 
@@ -776,5 +714,7 @@ PYBIND11_MODULE(vnoid_rl_env, m) {
         .def(py::init<const std::string&, bool>())  // レンダリング有効化オプション
         .def("step", &VnoidEnv::step)
         .def("reset", &VnoidEnv::reset)
-        .def("should_close", &VnoidEnv::should_close);
+        .def("should_close", &VnoidEnv::should_close)
+        .def("get_control_log", &VnoidEnv::get_control_log)  // ★ 追加
+        .def("clear_control_log", &VnoidEnv::clear_control_log);  // ★ 追加
 }

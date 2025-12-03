@@ -27,7 +27,6 @@ target_include_directories(vnoid_rl_env PUBLIC
 
 target_include_directories(vnoid_rl_env PRIVATE
     ${Python3_INCLUDE_DIRS}
-    ${CMAKE_SOURCE_DIR}/external/matplotlib-cpp
 )
 
 # リンク設定

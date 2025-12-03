@@ -30,7 +30,7 @@ print("  - 推論モード: 学習済みポリシー使用")
 print("=" * 70)
 
 # チェックポイント確認
-checkpoint_dir = os.path.abspath("./humanoid_vnoid_checkpoint")
+checkpoint_dir = os.path.abspath("./humanoid_vnoid_checkpoint_slip_011_gaitcommand")
 if not os.path.exists(checkpoint_dir):
     print(f"\n❌ エラー: チェックポイントが見つかりません")
     print(f"パス: {checkpoint_dir}")
@@ -98,9 +98,10 @@ try:
             )
 
             RL介入なし
-            action = env.action_space.sample()
+            action = np.zeros(5)
             """
-            action = env.action_space.sample()
+
+            action = np.zeros(5)
             
         # ステップ実行
         obs, reward, terminated, truncated, info , step_frames= env.step(action)
@@ -123,6 +124,15 @@ except Exception as e:
     print(f"\n❌ 録画エラー: {e}")
 finally:
     print("-" * 70)
+
+    # ★★★ close()の前にログを取得 ★★★
+    print("\n📊 制御データを取得中...")
+    try:
+        log = env.get_control_log()
+    except Exception as e:
+        print(f"⚠️ ログ取得エラー: {e}")
+        log = None
+
     env.close()
 
 # 動画保存
@@ -148,3 +158,17 @@ print(f"📊 総フレーム数: {len(frames)}")
 print(f"⏱️  動画の長さ: {len(frames)/OUTPUT_FPS:.1f}秒")
 print(f"🎮 制御周波数: 60fps (sample_controller_mujocoと同じ)")
 print("=" * 70)
+# ★ ログをプロット（既に取得済み）
+if log is not None and len(log.get('time', [])) > 0:
+    print("\n📊 制御データをプロット中...")
+    try:
+        from plot_control_data import plot_control_analysis
+        plot_control_analysis(log)
+    except Exception as e:
+        print(f"⚠️ グラフ生成エラー: {e}")
+        import traceback
+        traceback.print_exc()
+else:
+    print("\n⚠️ ログデータが空です（レンダリングが無効の可能性）")
+
+print("\n✅ 全処理完了")

@@ -81,11 +81,11 @@ class HumanoidVnoidEnv(gym.Env):
         """
         # actionをスケーリング
          rl_action = np.zeros(5, dtype=np.float64)
-         rl_action[0] = action[0] * 0.05   # stride
-         rl_action[1] = action[1] * 0.05   # foot_offset_y: ±5cm
-         rl_action[2] = action[2] * 0.0 #0.0005  # foot_angle_roll: ±0.1rad およそ５度ずつ
-         rl_action[3] = action[3] * 0.0#0.0005  # foot_angle_pitch: ±0.1rad　およそ５度ずつ
-         rl_action[4] = action[4] * 0.0   # foot_angle_yaw: ±0.2rad　およそ５度ずつ
+         rl_action[0] = action[0] * 0.15   
+         rl_action[1] = action[1] * 0.1   
+         rl_action[2] = action[2] * 0.15 
+         rl_action[3] = action[3] * 0.1
+         rl_action[4] = action[4] * 0.2  
 
          '''
           Step step;
@@ -132,6 +132,14 @@ class HumanoidVnoidEnv(gym.Env):
         if hasattr(self.cpp_env, 'should_close') and self.cpp_env.should_close():
             print("ウィンドウが閉じられました。")
         del self.cpp_env
+
+    def get_control_log(self):
+        """C++側からログデータを取得"""
+        return self.cpp_env.get_control_log()
+    
+    def clear_control_log(self):
+        """C++側のログをクリア"""
+        self.cpp_env.clear_control_log()
 
 tune.register_env("HumanoidVnoid-v0", 
                   lambda config: HumanoidVnoidEnv(
