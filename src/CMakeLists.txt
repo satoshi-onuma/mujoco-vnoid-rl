@@ -10,6 +10,7 @@ set(VNOID_HEADERS
 	"rollpitchyaw.h"
 	"stabilizer.h"
     "stepping_controller.h"
+	"reactive_walking_controller.h"
     "types.h"
 	)
 set(VNOID_SOURCES
@@ -24,6 +25,7 @@ set(VNOID_SOURCES
 	"rollpitchyaw.cpp"
 	"stabilizer.cpp"
     "stepping_controller.cpp"
+	"reactive_walking_controller.cpp"
 	)
 	
 if(VNOID_BUILD_CNOID)

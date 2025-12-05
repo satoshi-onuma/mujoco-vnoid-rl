@@ -502,7 +502,7 @@ public:
         rl_params.duration_offset = ptr[4];
 
         bool step_completed = false;
-        int prev_support_leg = robot->footstep_buffer.steps[0].side;
+        int prev_support_leg = robot->rea_con.sup;
         //並列環境で変数が共有されてる？
         int step_counter = 0;
 
@@ -548,7 +548,7 @@ public:
             }
         
             // 1歩完了を検出
-            int current_support_leg = robot->footstep_buffer.steps[0].side;
+            int current_support_leg = robot->rea_con.sup;
             step_completed = (current_support_leg != prev_support_leg);
         
             if (step_completed) {
