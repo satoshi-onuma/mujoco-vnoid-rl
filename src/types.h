@@ -16,9 +16,5 @@
 #endif
 // RLからの指令を受け取るための構造体
  struct RLParams {
-    double stride_offset = 0.0;
-    double turn_offset = 0.0;
-    double spacing_offset = 0.0;
-    double climb_offset = 0.0;
-    double duration_offset = 0.0;
+    Vector3 foot_offset = Vector3(0.0, 0.0, 0.0);
  };

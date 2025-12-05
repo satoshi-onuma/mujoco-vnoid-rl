@@ -62,7 +62,7 @@ class HumanoidVnoidEnv(gym.Env):
 
         
         # 行動空間と観測空間の設定
-        self.action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(5,), dtype=np.float32)
+        self.action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32)
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(16,), dtype=np.float64)
         
         mode_str = "録画モード(OpenGL有効)" if enable_rendering else "学習モード(OpenGL無効)"
@@ -80,12 +80,12 @@ class HumanoidVnoidEnv(gym.Env):
             obs, reward, terminated, truncated, info,frames
         """
         # actionをスケーリング
-         rl_action = np.zeros(5, dtype=np.float64)
+         rl_action = np.zeros(2, dtype=np.float64)
          rl_action[0] = action[0] * 0.15   
          rl_action[1] = action[1] * 0.1   
-         rl_action[2] = action[2] * 0.15 
-         rl_action[3] = action[3] * 0.1
-         rl_action[4] = action[4] * 0.2  
+         #rl_action[2] = action[2] * 0.15 
+         #rl_action[3] = action[3] * 0.1
+         #rl_action[4] = action[4] * 0.2  
 
          '''
           Step step;

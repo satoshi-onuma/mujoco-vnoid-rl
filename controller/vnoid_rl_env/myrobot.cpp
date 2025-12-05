@@ -168,11 +168,11 @@ void MyRobot::Control(const RLParams& rl_params){ // ★引数を追加
 			    footstep.steps.pop_back();
 
 		    Step step;
-	        step.stride   = 0.1 + rl_params.stride_offset;
-	        step.turn     = 0.0 + rl_params.turn_offset;
-	        step.spacing  = 0.2 + rl_params.spacing_offset;
-	        step.climb    = 0.0 + rl_params.climb_offset;
-	        step.duration = 0.4 + rl_params.duration_offset;
+	        step.stride   = 0.1  ;
+	        step.turn     = 0.0 ;
+	        step.spacing  = 0.2  ;
+	        step.climb    = 0.0  ;
+	        step.duration = 0.4 ;
 	        footstep.steps.push_back(step);
 	        footstep.steps.push_back(step);
 	        footstep.steps.push_back(step);
@@ -182,7 +182,7 @@ void MyRobot::Control(const RLParams& rl_params){ // ★引数を追加
             footstep_planner.GenerateDCM(param, footstep);
 	    }
 
-        stepping_controller.Update(timer, param, footstep, footstep_buffer,centroid, base, foot);
+        stepping_controller.Update(timer, param, footstep, footstep_buffer,centroid, base, foot,rl_params);
         // stabilizer performs balance feedback
         stabilizer         .Update(timer, param, centroid, base, foot);
     

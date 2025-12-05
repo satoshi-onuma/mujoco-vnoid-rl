@@ -487,7 +487,7 @@ public:
         std::cout << "[Worker " << std::this_thread::get_id() << "] Python step() called." << std::endl;
         
         auto buf = action.request();
-        if (buf.ndim != 1 || buf.size < 5) {
+        if (buf.ndim != 1 || buf.size < 2) {
             throw std::runtime_error("アクションの次元またはサイズが不正です。");
         }
         
@@ -495,11 +495,11 @@ public:
         RLParams rl_params;
          
         // actionから設定
-        rl_params.stride_offset = ptr[0];
-        rl_params.turn_offset = ptr[1];
-        rl_params.spacing_offset = ptr[2];
-        rl_params.climb_offset = ptr[3];
-        rl_params.duration_offset = ptr[4];
+        rl_params.foot_offset.x()= ptr[0];
+        rl_params.foot_offset.y() = ptr[1];
+        //rl_params.spacing_offset = ptr[2];
+        //rl_params.climb_offset = ptr[3];
+        //rl_params.duration_offset = ptr[4];
 
         bool step_completed = false;
         int prev_support_leg = robot->footstep_buffer.steps[0].side;

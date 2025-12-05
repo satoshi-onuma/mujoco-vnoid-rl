@@ -30,7 +30,7 @@ print("  - 推論モード: 学習済みポリシー使用")
 print("=" * 70)
 
 # チェックポイント確認
-checkpoint_dir = os.path.abspath("./humanoid_vnoid_checkpoint_slip_011_gaitcommand")
+checkpoint_dir = os.path.abspath("./humanoid_vnoid_checkpoint_id2")
 if not os.path.exists(checkpoint_dir):
     print(f"\n❌ エラー: チェックポイントが見つかりません")
     print(f"パス: {checkpoint_dir}")
@@ -92,16 +92,21 @@ try:
             RL介入あり
 
             action = np.clip(
-                action_dist_params[:5],  # 0=mean, 1=log(stddev), [0:1]=use mean, but keep shape=(1,)
+                action_dist_params[:2],  # 0=mean, 1=log(stddev), [0:1]=use mean, but keep shape=(1,)
                 a_min=env.action_space.low,
                 a_max=env.action_space.high,
             )
 
             RL介入なし
-            action = np.zeros(5)
+            action = np.zeros(2)
             """
 
-            action = np.zeros(5)
+            
+            action = np.clip(
+                action_dist_params[:2],  # 0=mean, 1=log(stddev), [0:1]=use mean, but keep shape=(1,)
+                a_min=env.action_space.low,
+                a_max=env.action_space.high,
+            )
             
         # ステップ実行
         obs, reward, terminated, truncated, info , step_frames= env.step(action)

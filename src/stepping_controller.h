@@ -30,7 +30,7 @@ public:
     double    time_to_landing;
 
 public:
-	void Update      (const Timer& timer, const Param& param, Footstep& footstep, Footstep& footstep_buffer, Centroid& centroid, Base& base, vector<Foot>& foot);
+	void Update      (const Timer& timer, const Param& param, Footstep& footstep, Footstep& footstep_buffer, Centroid& centroid, Base& base, vector<Foot>& foot,const RLParams& rl_params);
     
 	SteppingController();
 };

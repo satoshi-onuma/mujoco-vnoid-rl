@@ -21,7 +21,7 @@ SteppingController::SteppingController(){
     time_to_landing = 0.0;
 }
 
-void SteppingController::Update(const Timer& timer, const Param& param, Footstep& footstep, Footstep& footstep_buffer, Centroid& centroid, Base& base, vector<Foot>& foot/*, const RLParams& rl_params*/){
+void SteppingController::Update(const Timer& timer, const Param& param, Footstep& footstep, Footstep& footstep_buffer, Centroid& centroid, Base& base, vector<Foot>& foot, const RLParams& rl_params){
     double T  = param.T;
     Vector3 offset(0.0, 0.0, param.com_height);
     
@@ -124,11 +124,13 @@ void SteppingController::Update(const Timer& timer, const Param& param, Footstep
     stb1.foot_pos[swg].x() = land_dcm.x() - (st1.dcm.x() - st1.foot_pos[swg].x());
 	stb1.foot_pos[swg].y() = land_dcm.y() - (st1.dcm.y() - st1.foot_pos[swg].y());
 
+    
 
-    /*
-     // ★★★ ここでRLからの指令（オフセット）を加える ★★★
     stb1.foot_pos[swg].x() += rl_params.foot_offset.x();
     stb1.foot_pos[swg].y() += rl_params.foot_offset.y();
+    /*
+     // ★★★ ここでRLからの指令（オフセット）を加える ★★★
+    
 
     // ★ RLからの角度残差オフセット（新規追加）
     stb1.foot_angle[swg].x() += rl_params.foot_angle_offset.x(); // roll

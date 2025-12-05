@@ -184,7 +184,7 @@ void MyRobot::Control(const RLParams& rl_params){ // ★引数を追加
 
         // stepping controller generates swing foot trajectory 
         // it also performs landing position adaptation
-        stepping_controller.Update(timer, param, footstep, footstep_buffer, centroid, base, foot);//rl追加
+        stepping_controller.Update(timer, param, footstep, footstep_buffer, centroid, base, foot,rl_params);//rl追加
     
         // stabilizer performs balance feedback
         stabilizer         .Update(timer, param, centroid, base, foot);
