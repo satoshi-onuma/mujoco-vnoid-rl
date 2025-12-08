@@ -54,9 +54,9 @@ def plot_control_analysis(log):
     
     # --- パネル3: ZMP ---
     plt.subplot(3, 2, 3)
-    plt.plot(log['time'], log['zmp_x'], 'r-', label='Actual X')
+    #plt.plot(log['time'], log['zmp_x'], 'r-', label='Actual X')
     plt.plot(log['time'], log['zmp_ref_x'], 'r--', label='Ref X')
-    plt.plot(log['time'], log['zmp_y'], 'g-', label='Actual Y')
+    #plt.plot(log['time'], log['zmp_y'], 'g-', label='Actual Y')
     plt.plot(log['time'], log['zmp_ref_y'], 'g--', label='Ref Y')
     plt.xlabel('Time [s]')
     plt.ylabel('Position [m]')
@@ -91,7 +91,7 @@ def plot_control_analysis(log):
     
     # --- パネル6: ZMP & DCM Trajectory (XY平面) ---
     plt.subplot(3, 2, 6)
-    plt.plot(log['zmp_x'], log['zmp_y'], 'r-', label='ZMP Actual')
+    #plt.plot(log['zmp_x'], log['zmp_y'], 'r-', label='ZMP Actual')
     plt.plot(log['zmp_ref_x'], log['zmp_ref_y'], 'r--', label='ZMP Ref')
     plt.plot(log['dcm_x'], log['dcm_y'], 'b-', label='DCM Actual')
     plt.plot(log['dcm_ref_x'], log['dcm_ref_y'], 'b--', label='DCM Ref')

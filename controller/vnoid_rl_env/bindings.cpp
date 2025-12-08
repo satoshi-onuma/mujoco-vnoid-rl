@@ -60,7 +60,7 @@ private:
         // 実測値
         std::vector<double> com_pos_x, com_pos_y, com_pos_z;
         std::vector<double> com_vel_x, com_vel_y, com_vel_z;
-        std::vector<double> zmp_x, zmp_y, zmp_z;
+        //std::vector<double> zmp_x, zmp_y, zmp_z;
         std::vector<double> dcm_x, dcm_y, dcm_z;
         
         // 目標値
@@ -72,7 +72,7 @@ private:
             time.clear();
             com_pos_x.clear(); com_pos_y.clear(); com_pos_z.clear();
             com_vel_x.clear(); com_vel_y.clear(); com_vel_z.clear();
-            zmp_x.clear(); zmp_y.clear(); zmp_z.clear();
+            //zmp_x.clear(); zmp_y.clear(); zmp_z.clear();
             dcm_x.clear(); dcm_y.clear(); dcm_z.clear();
             com_pos_ref_x.clear(); com_pos_ref_y.clear(); com_pos_ref_z.clear();
             zmp_ref_x.clear(); zmp_ref_y.clear(); zmp_ref_z.clear();
@@ -83,7 +83,7 @@ private:
             time.reserve(n);
             com_pos_x.reserve(n); com_pos_y.reserve(n); com_pos_z.reserve(n);
             com_vel_x.reserve(n); com_vel_y.reserve(n); com_vel_z.reserve(n);
-            zmp_x.reserve(n); zmp_y.reserve(n); zmp_z.reserve(n);
+            //zmp_x.reserve(n); zmp_y.reserve(n); zmp_z.reserve(n);
             dcm_x.reserve(n); dcm_y.reserve(n); dcm_z.reserve(n);
             com_pos_ref_x.reserve(n); com_pos_ref_y.reserve(n); com_pos_ref_z.reserve(n);
             zmp_ref_x.reserve(n); zmp_ref_y.reserve(n); zmp_ref_z.reserve(n);
@@ -96,6 +96,7 @@ private:
     Vector3 prev_com_pos;
     Vector3 com_vel_actual;
     bool first_step = true;
+    bool logging_completed = false;
 
 public:
     
@@ -186,12 +187,12 @@ public:
         log["com_vel_x"] = control_log.com_vel_x;
         log["com_vel_y"] = control_log.com_vel_y;
         log["com_vel_z"] = control_log.com_vel_z;
-        log["zmp_x"] = control_log.zmp_x;
-        log["zmp_y"] = control_log.zmp_y;
-        log["zmp_z"] = control_log.zmp_z;
+        //log["zmp_x"] = control_log.zmp_x;
+        //log["zmp_y"] = control_log.zmp_y;
+        //log["zmp_z"] = control_log.zmp_z;
         log["dcm_x"] = control_log.dcm_x;
         log["dcm_y"] = control_log.dcm_y;
-        log["dcm_z"] = control_log.dcm_z;
+        //log["dcm_z"] = control_log.dcm_z;
         
         // 目標値
         log["com_pos_ref_x"] = control_log.com_pos_ref_x;
@@ -199,10 +200,10 @@ public:
         log["com_pos_ref_z"] = control_log.com_pos_ref_z;
         log["zmp_ref_x"] = control_log.zmp_ref_x;
         log["zmp_ref_y"] = control_log.zmp_ref_y;
-        log["zmp_ref_z"] = control_log.zmp_ref_z;
+        //log["zmp_ref_z"] = control_log.zmp_ref_z;
         log["dcm_ref_x"] = control_log.dcm_ref_x;
         log["dcm_ref_y"] = control_log.dcm_ref_y;
-        log["dcm_ref_z"] = control_log.dcm_ref_z;
+        //log["dcm_ref_z"] = control_log.dcm_ref_z;
         
         return log;
     }
@@ -325,6 +326,10 @@ private:
 
     void log_control_data() {
         if (!rendering_enabled|| !robot) return;
+
+        if (logging_completed) {
+            return;
+        }
         
         // CoM速度を計算（キャッシュされる）
         Vector3 com_vel = calc_com_velocity();
@@ -341,12 +346,12 @@ private:
         control_log.com_vel_x.push_back(com_vel.x());
         control_log.com_vel_y.push_back(com_vel.y());
         control_log.com_vel_z.push_back(com_vel.z());
-        control_log.zmp_x.push_back(robot->centroid.zmp.x());
-        control_log.zmp_y.push_back(robot->centroid.zmp.y());
-        control_log.zmp_z.push_back(robot->centroid.zmp.z());
+        //control_log.zmp_x.push_back(robot->centroid.zmp.x());
+        //control_log.zmp_y.push_back(robot->centroid.zmp.y());
+        //control_log.zmp_z.push_back(robot->centroid.zmp.z());
         control_log.dcm_x.push_back(dcm_actual.x());
         control_log.dcm_y.push_back(dcm_actual.y());
-        control_log.dcm_z.push_back(dcm_actual.z());
+        //control_log.dcm_z.push_back(dcm_actual.z());
         
         // 目標値
         control_log.com_pos_ref_x.push_back(robot->centroid.com_pos_ref.x());
@@ -354,10 +359,10 @@ private:
         control_log.com_pos_ref_z.push_back(robot->centroid.com_pos_ref.z());
         control_log.zmp_ref_x.push_back(robot->centroid.zmp_ref.x());
         control_log.zmp_ref_y.push_back(robot->centroid.zmp_ref.y());
-        control_log.zmp_ref_z.push_back(robot->centroid.zmp_ref.z());
+        //control_log.zmp_ref_z.push_back(robot->centroid.zmp_ref.z());
         control_log.dcm_ref_x.push_back(robot->centroid.dcm_ref.x());
         control_log.dcm_ref_y.push_back(robot->centroid.dcm_ref.y());
-        control_log.dcm_ref_z.push_back(robot->centroid.dcm_ref.z());
+        //control_log.dcm_ref_z.push_back(robot->centroid.dcm_ref.z());
     }
     
 
@@ -455,6 +460,12 @@ public:
     py::array_t<double> reset() {
         if (!initialized) {
             throw std::runtime_error("環境が初期化されていません。");
+        }
+
+        if (!control_log.time.empty() && !logging_completed) {
+            logging_completed = true;
+            std::cout << "✅ 最初のエピソード完了、ロギング停止（" 
+                  << control_log.time.size() << "サンプル）" << std::endl;
         }
     
         // データを完全に削除して再作成
