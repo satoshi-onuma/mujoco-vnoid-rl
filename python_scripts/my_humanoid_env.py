@@ -62,7 +62,7 @@ class HumanoidVnoidEnv(gym.Env):
 
         
         # 行動空間と観測空間の設定
-        self.action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(5,), dtype=np.float32)
+        self.action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(6,), dtype=np.float32)
         self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(16,), dtype=np.float64)
         
         mode_str = "録画モード(OpenGL有効)" if enable_rendering else "学習モード(OpenGL無効)"
@@ -80,20 +80,20 @@ class HumanoidVnoidEnv(gym.Env):
             obs, reward, terminated, truncated, info,frames
         """
         # actionをスケーリング
-         rl_action = np.zeros(5, dtype=np.float64)
-         rl_action[0] = action[0] * 0.15   
-         rl_action[1] = action[1] * 0.1   
-         rl_action[2] = action[2] * 0.15 
-         rl_action[3] = action[3] * 0.1
-         rl_action[4] = action[4] * 0.2  
+         rl_action = np.zeros(6, dtype=np.float64)
+         rl_action[0] = action[0] * 1.0
+         rl_action[1] = action[1] * 1.0
+         rl_action[2] = action[2] * 1.0
+         rl_action[3] = action[3] * 1.0
+         rl_action[4] = action[4] * 1.0
+         rl_action[5] = action[5] * 1.0
 
          '''
-          Step step;
-	        step.stride   = 0.1 + rl_params.stride_offset;
-	        step.turn     = 0.0 + rl_params.turn_offset;
-	        step.spacing  = 0.2 + rl_params.spacing_offset;
-	        step.climb    = 0.0 + rl_params.climb_offset;
-	        step.duration = 0.4 + rl_params.duration_offset;
+          hand[0].pos_ref = centroid.com_pos_ref + base.ori_ref*{Vector3(0.0, -0.25, -0.1)+ rl_params.hand_pos_L};
+        hand[0].ori_ref = base.ori_ref;
+        hand[1].pos_ref = centroid.com_pos_ref + base.ori_ref*{Vector3(0.0,  0.25, -0.1) + rl_params.hand_pos_R};
+        hand[1].ori_ref = base.ori_ref;
+
          '''
 
          print(rl_action)

@@ -168,11 +168,11 @@ void MyRobot::Control(const RLParams& rl_params){ // ★引数を追加
 			    footstep.steps.pop_back();
 
 		    Step step;
-	        step.stride   = 0.1 + rl_params.stride_offset;
-	        step.turn     = 0.0 + rl_params.turn_offset;
-	        step.spacing  = 0.2 + rl_params.spacing_offset;
-	        step.climb    = 0.0 + rl_params.climb_offset;
-	        step.duration = 0.4 + rl_params.duration_offset;
+	        step.stride   = 0.1 ;
+	        step.turn     = 0.0;
+	        step.spacing  = 0.2 ;
+	        step.climb    = 0.0;
+	        step.duration = 0.4 ;
 	        footstep.steps.push_back(step);
 	        footstep.steps.push_back(step);
 	        footstep.steps.push_back(step);
@@ -186,9 +186,9 @@ void MyRobot::Control(const RLParams& rl_params){ // ★引数を追加
         // stabilizer performs balance feedback
         stabilizer         .Update(timer, param, centroid, base, foot);
     
-        hand[0].pos_ref = centroid.com_pos_ref + base.ori_ref*Vector3(0.0, -0.25, -0.1);
+        hand[0].pos_ref = centroid.com_pos_ref + base.ori_ref*(Vector3(0.0, -0.25, -0.1)+ rl_params.hand_pos_L);
         hand[0].ori_ref = base.ori_ref;
-        hand[1].pos_ref = centroid.com_pos_ref + base.ori_ref*Vector3(0.0,  0.25, -0.1);
+        hand[1].pos_ref = centroid.com_pos_ref + base.ori_ref*(Vector3(0.0,  0.25, -0.1) + rl_params.hand_pos_R);
         hand[1].ori_ref = base.ori_ref;
 
         // calc CoM IK

@@ -92,17 +92,17 @@ try:
             RL介入あり
 
             action = np.clip(
-                action_dist_params[:5],  # 0=mean, 1=log(stddev), [0:1]=use mean, but keep shape=(1,)
+                action_dist_params[:6],  # 0=mean, 1=log(stddev), [0:1]=use mean, but keep shape=(1,)
                 a_min=env.action_space.low,
                 a_max=env.action_space.high,
             )
 
             RL介入なし
-            action = np.zeros(5)
+            action = np.zeros(6)
             """
 
             action = np.clip(
-                action_dist_params[:5],  # 0=mean, 1=log(stddev), [0:1]=use mean, but keep shape=(1,)
+                action_dist_params[:6],  # 0=mean, 1=log(stddev), [0:1]=use mean, but keep shape=(1,)
                 a_min=env.action_space.low,
                 a_max=env.action_space.high,
             )

@@ -40,6 +40,11 @@ private:
     double previous_x = 0.0;
     int frame_skip;
 
+        // ★前回の行動を保存
+    std::vector<double> prev_action;
+    bool first_action = true;
+    double action_change_penalty_weight = 0.1;  // 調整可能
+
     // レンダリング用のオブジェクト（オプショナル）
     mjvCamera cam;
     mjvOption opt;
@@ -166,6 +171,10 @@ public:
         prev_com_pos = Vector3(0.0, 0.0, 0.0);
         com_vel_actual = Vector3(0.0, 0.0, 0.0);
         first_step = true;
+
+        // ★行動空間のサイズに合わせて初期化（11次元）
+        prev_action.resize(6, 0.0);
+        first_action = true;
         
         std::cout << "✅ VnoidEnv初期化完了" << std::endl;
     }
@@ -484,6 +493,9 @@ public:
         first_step = true;
         prev_com_pos = Vector3(0.0, 0.0, 0.0);
         com_vel_actual = Vector3(0.0, 0.0, 0.0);
+
+        std::fill(prev_action.begin(), prev_action.end(), 0.0);
+        first_action = true;
     
         return get_observation();
     }
@@ -498,19 +510,40 @@ public:
         std::cout << "[Worker " << std::this_thread::get_id() << "] Python step() called." << std::endl;
         
         auto buf = action.request();
-        if (buf.ndim != 1 || buf.size < 5) {
+        if (buf.ndim != 1 || buf.size < 6) {
             throw std::runtime_error("アクションの次元またはサイズが不正です。");
         }
         
         double* ptr = static_cast<double*>(buf.ptr);
+        
+        // ★現在の行動を取得
+        std::vector<double> current_action(ptr, ptr + buf.size);
+
+        // ★行動の変化量を計算してペナルティを追加
+        double action_change_penalty = 0.0;
+        if (!first_action) {
+            double action_diff_sum = 0.0;
+            for (int i = 0; i < buf.size; i++) {
+                double diff = current_action[i] - prev_action[i];
+                action_diff_sum += diff * diff;
+            }
+            double action_diff_norm = std::sqrt(action_diff_sum);
+            action_change_penalty = -action_change_penalty_weight * action_diff_norm;
+        }
+        
+        // ★現在の行動を保存
+        prev_action = current_action;
+        first_action = false;
+
         RLParams rl_params;
          
         // actionから設定
-        rl_params.stride_offset = ptr[0];
-        rl_params.turn_offset = ptr[1];
-        rl_params.spacing_offset = ptr[2];
-        rl_params.climb_offset = ptr[3];
-        rl_params.duration_offset = ptr[4];
+        rl_params.hand_pos_L.x() = ptr[0];
+        rl_params.hand_pos_L.y() = ptr[1];
+        rl_params.hand_pos_L.z()  = ptr[2];
+        rl_params.hand_pos_R.x() = ptr[3];
+        rl_params.hand_pos_R.y()  = ptr[4];
+        rl_params.hand_pos_R.z()  = ptr[5];
 
         bool step_completed = false;
         int prev_support_leg = robot->footstep_buffer.steps[0].side;
@@ -583,6 +616,8 @@ public:
 
         py::array_t<double> obs = get_observation();
         double reward = compute_reward();
+
+        reward += action_change_penalty;
 
         if (timeout) {
             reward = -10.0;
