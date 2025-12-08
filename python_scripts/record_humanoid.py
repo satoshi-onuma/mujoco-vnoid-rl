@@ -30,7 +30,7 @@ print("  - 推論モード: 学習済みポリシー使用")
 print("=" * 70)
 
 # チェックポイント確認
-checkpoint_dir = os.path.abspath("./humanoid_vnoid_checkpoint_id2")
+checkpoint_dir = os.path.abspath("./humanoid_vnoid_checkpoint")
 if not os.path.exists(checkpoint_dir):
     print(f"\n❌ エラー: チェックポイントが見つかりません")
     print(f"パス: {checkpoint_dir}")
@@ -77,7 +77,7 @@ try:
     for i in range(TOTAL_STEPS):
 
         if i < 2:
-            action = np.zeros(5)  # 何もしない
+            action = np.zeros(2)  # 何もしない
         else:
              # ★ Rayで推論（explore=Falseで決定的行動）
             obs_batch = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)
