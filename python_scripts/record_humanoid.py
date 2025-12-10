@@ -30,7 +30,7 @@ print("  - 推論モード: 学習済みポリシー使用")
 print("=" * 70)
 
 # チェックポイント確認
-checkpoint_dir = os.path.abspath("./humanoid_vnoid_checkpoint_id1")
+checkpoint_dir = os.path.abspath("./humanoid_vnoid_checkpoint")
 if not os.path.exists(checkpoint_dir):
     print(f"\n❌ エラー: チェックポイントが見つかりません")
     print(f"パス: {checkpoint_dir}")
@@ -76,19 +76,19 @@ print("-" * 70)
 try:
     for i in range(TOTAL_STEPS):
 
-        if i < 2:
-            action = np.zeros(5)  # 何もしない
-        else:
+        '''if i < 2:
+            action = np.zeros(6)  # 何もしない
+        else:'''
              # ★ Rayで推論（explore=Falseで決定的行動）
-            obs_batch = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)
+        obs_batch = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)
              # 推論（勾配計算不要）
-            with torch.no_grad():
-                model_outputs = rl_module.forward_inference({"obs": obs_batch})
+        with torch.no_grad():
+            model_outputs = rl_module.forward_inference({"obs": obs_batch})
             
-            action_dist_params = model_outputs["action_dist_inputs"][0].numpy()
+        action_dist_params = model_outputs["action_dist_inputs"][0].numpy()
 
             
-            """
+        """
             RL介入あり
 
             action = np.clip(
@@ -101,11 +101,11 @@ try:
             action = np.zeros(6)
             """
 
-            action = np.clip(
-                action_dist_params[:6],  # 0=mean, 1=log(stddev), [0:1]=use mean, but keep shape=(1,)
-                a_min=env.action_space.low,
-                a_max=env.action_space.high,
-            )
+        action = np.clip(
+            action_dist_params[:6],  # 0=mean, 1=log(stddev), [0:1]=use mean, but keep shape=(1,)
+            a_min=env.action_space.low,
+            a_max=env.action_space.high,
+        )
             
         # ステップ実行
         obs, reward, terminated, truncated, info , step_frames= env.step(action)

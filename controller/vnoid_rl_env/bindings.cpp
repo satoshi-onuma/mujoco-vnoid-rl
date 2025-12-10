@@ -172,7 +172,7 @@ public:
         com_vel_actual = Vector3(0.0, 0.0, 0.0);
         first_step = true;
 
-        // ★行動空間のサイズに合わせて初期化（11次元）
+        // ★行動空間のサイズに合わせて初期化（6次元）
         prev_action.resize(6, 0.0);
         first_action = true;
         
