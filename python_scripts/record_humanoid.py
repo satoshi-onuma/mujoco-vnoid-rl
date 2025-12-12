@@ -102,12 +102,7 @@ try:
             """
 
             
-            action = np.clip(
-                action_dist_params[:2],  # 0=mean, 1=log(stddev), [0:1]=use mean, but keep shape=(1,)
-                a_min=env.action_space.low,
-                a_max=env.action_space.high,
-            )
-            
+            action = np.zeros(2)
         # ステップ実行
         obs, reward, terminated, truncated, info , step_frames= env.step(action)
 

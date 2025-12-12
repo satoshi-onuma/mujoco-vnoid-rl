@@ -38,12 +38,12 @@
 
   <default>
     <motor ctrlrange="-100 100" ctrllimited="true"/>
-    <geom condim="3" friction="1" solimp=".9 .99 .003" solref=".001 100" material="body" group="1"/>
+    <geom condim="3" friction="1.0" solimp=".9 .99 .003" solref=".001 100" material="body" group="1"/>
     <joint type="hinge" damping=".0" stiffness="0" armature=".01" limited="true" solimplimit="0 .99 .01"/>
   </default>
 
   <worldbody>
-    <geom name="floor" size="0 0 .05" type="plane" material="grid" condim="3" conaffinity="1" friction="1" solref="0.1 2" solimp=".7 .85 .003" />
+    <geom name="floor" size="0 0 .05" type="plane" material="grid" condim="3" conaffinity="1" />
     <light name="spotlight" mode="targetbodycom" target="HIPS" diffuse=".8 .8 .8" specular="0.3 0.3 0.3" pos="0 -6 4" cutoff="30"/>
     <body name="HIPS" pos="0 0 0.9">
       <freejoint name="root"/>
@@ -165,7 +165,7 @@
                   <!--
                   <geom name="R_FOOT_R" type="mesh" mesh="FOOT_R" conaffinity="0"/>
                   -->
-                  <geom name="R_FOOT_R" type="box" size="0.1 0.05 0.05" conaffinity="1"/>
+                  <geom name="R_FOOT_R" type="box" size="0.1 0.05 0.05" conaffinity="0"/>
                   <joint name="R_FOOT_R" type="hinge" axis="1 0 0" range="-60 60"/>
                   <inertial pos="0 0 0" mass="0.5" diaginertia="0.0003 0.001 0.001"/>
                   <site name="rfsensor"/>
@@ -199,7 +199,7 @@
                   <!--
                   <geom type="mesh" mesh="FOOT_R" conaffinity="0"/>
                   -->
-                  <geom type="box" size="0.1 0.05 0.05" conaffinity="1"/>
+                  <geom type="box" size="0.1 0.05 0.05" conaffinity="0"/>
                   <joint name="L_FOOT_R" type="hinge" axis="1 0 0" range="-60 60"/>
                   <inertial pos="0 0 0" mass="0.5" diaginertia="0.0003 0.001 0.001"/>
                   <site name="lfsensor"/>
