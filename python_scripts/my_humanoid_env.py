@@ -82,18 +82,21 @@ class HumanoidVnoidEnv(gym.Env):
         # actionをスケーリング
          rl_action = np.zeros(2, dtype=np.float64)
          rl_action[0] = action[0] * 0.15   
-         rl_action[1] = action[1] * 0.1   
+         rl_action[1] = action[1] * 0.15   
          #rl_action[2] = action[2] * 0.15 
          #rl_action[3] = action[3] * 0.1
          #rl_action[4] = action[4] * 0.2  
-
+            #actionはすべて-1~1で入ってくる
          '''
           Step step;
-	        step.stride   = 0.1 + rl_params.stride_offset;
-	        step.turn     = 0.0 + rl_params.turn_offset;
+	        step.stride   = 0.1 ;
+	        step.turn     = 0.0 ;
 	        step.spacing  = 0.2 + rl_params.spacing_offset;
 	        step.climb    = 0.0 + rl_params.climb_offset;
 	        step.duration = 0.4 + rl_params.duration_offset;
+
+            stb1.foot_pos[swg].x() += rl_params.foot_offset.x();
+            stb1.foot_pos[swg].y() += rl_params.foot_offset.y();
          '''
 
          print(rl_action)
