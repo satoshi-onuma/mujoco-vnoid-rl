@@ -154,11 +154,11 @@
             <joint name="R_UPPERLEG_P" type="hinge" axis="0 1 0" range="-110 30"/>
             <inertial pos="0 0 -0.15" mass="1.5" diaginertia="0.01 0.01 0.001"/>
             <body name="R_LOWERLEG_P" pos="0 0 -0.3">
-              <geom type="mesh" mesh="LOWERLEG_P" conaffinity="0"/>
+              <geom type="mesh" mesh="LOWERLEG_P" conaffinity="0" contype = "0"/>
               <joint name="R_LOWERLEG_P" type="hinge" axis="0 1 0" range="0 140"/>
               <inertial pos="0 0 -0.2" mass="1.5" diaginertia="0.02 0.02 0.002"/>
               <body name="R_FOOT_P" pos="0 0 -0.4">
-                <geom type="mesh" mesh="FOOT_P" conaffinity="0"/>
+                <geom type="mesh" mesh="FOOT_P" conaffinity="0" contype = "0"/>
                 <joint name="R_FOOT_P" type="hinge" axis="0 1 0" range="-60 60"/>
                 <inertial pos="0 0 0" mass="0.5" diaginertia="0.0003 0.0003 0.0003"/>
                 <body name="R_FOOT_R" pos="0 0 0">
@@ -173,7 +173,7 @@
               </body>
             </body>
           </body>
-        </body>
+        </body>contype = "0"
       </body>
       <body name="L_UPPERLEG_Y" pos="0 0.1 -0.1">
         <geom type="mesh" mesh="UPPERLEG_Y" conaffinity="0"/>
@@ -188,11 +188,11 @@
             <joint name="L_UPPERLEG_P" type="hinge" axis="0 1 0" range="-110 30"/>
             <inertial pos="0 0 -0.15" mass="1.5" diaginertia="0.01 0.01 0.001"/>
             <body name="L_LOWERLEG_P" pos="0 0 -0.3">
-              <geom type="mesh" mesh="LOWERLEG_P" conaffinity="0"/>
+              <geom type="mesh" mesh="LOWERLEG_P" conaffinity="0" contype = "0"/>
               <joint name="L_LOWERLEG_P" type="hinge" axis="0 1 0" range="0 140"/>
               <inertial pos="0 0 -0.2" mass="1.5" diaginertia="0.02 0.02 0.002"/>
               <body name="L_FOOT_P" pos="0 0 -0.4">
-                <geom type="mesh" mesh="FOOT_P" conaffinity="0"/>
+                <geom type="mesh" mesh="FOOT_P" conaffinity="0" contype = "0"/>
                 <joint name="L_FOOT_P" type="hinge" axis="0 1 0" range="-60 60"/>
                 <inertial pos="0 0 0" mass="0.5" diaginertia="0.0003 0.0003 0.0003"/>
                 <body name="L_FOOT_R" pos="0 0 0">
