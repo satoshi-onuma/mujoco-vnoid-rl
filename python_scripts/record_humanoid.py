@@ -30,7 +30,7 @@ print("  - 推論モード: 学習済みポリシー使用")
 print("=" * 70)
 
 # チェックポイント確認
-checkpoint_dir = os.path.abspath("./humanoid_vnoid_checkpoint_id1")
+checkpoint_dir = os.path.abspath("./humanoid_vnoid_checkpoint_id3")
 if not os.path.exists(checkpoint_dir):
     print(f"\n❌ エラー: チェックポイントが見つかりません")
     print(f"パス: {checkpoint_dir}")

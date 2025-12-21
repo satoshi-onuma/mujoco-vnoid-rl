@@ -82,7 +82,7 @@ class HumanoidVnoidEnv(gym.Env):
         # actionをスケーリング
          rl_action = np.zeros(2, dtype=np.float64)
          rl_action[0] = action[0] * 0.15   
-         rl_action[1] = action[1] * 0.15   
+         rl_action[1] = action[1] * 0.1  
          #rl_action[2] = action[2] * 0.15 
          #rl_action[3] = action[3] * 0.1
          #rl_action[4] = action[4] * 0.2  

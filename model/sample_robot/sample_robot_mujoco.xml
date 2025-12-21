@@ -38,12 +38,12 @@
 
   <default>
     <motor ctrlrange="-100 100" ctrllimited="true"/>
-    <geom condim="3" friction="0.11" solimp=".9 .99 .003" solref=".001 100" material="body" group="1"/>
+    <geom condim="3" friction="1" solimp=".9 .99 .003" solref=".001 100" material="body" group="1"/>
     <joint type="hinge" damping=".0" stiffness="0" armature=".01" limited="true" solimplimit="0 .99 .01"/>
   </default>
 
   <worldbody>
-    <geom name="floor" size="0 0 .05" type="plane" material="grid" condim="3" conaffinity="1" solref="0.05 2" solimp=".7 .99 .003"/>
+   <geom name="floor" size="0 0 .05" type="plane" material="grid" condim="3" conaffinity="1" friction="1" solref="0.1 2" solimp=".7 .85 .003" />
     <light name="spotlight" mode="targetbodycom" target="HIPS" diffuse=".8 .8 .8" specular="0.3 0.3 0.3" pos="0 -6 4" cutoff="30"/>
     <body name="HIPS" pos="0 0 0.9">
       <freejoint name="root"/>
@@ -154,18 +154,18 @@
             <joint name="R_UPPERLEG_P" type="hinge" axis="0 1 0" range="-110 30"/>
             <inertial pos="0 0 -0.15" mass="1.5" diaginertia="0.01 0.01 0.001"/>
             <body name="R_LOWERLEG_P" pos="0 0 -0.3">
-              <geom type="mesh" mesh="LOWERLEG_P" conaffinity="0" contype ="0"/>
+              <geom type="mesh" mesh="LOWERLEG_P" conaffinity="0"/>
               <joint name="R_LOWERLEG_P" type="hinge" axis="0 1 0" range="0 140"/>
               <inertial pos="0 0 -0.2" mass="1.5" diaginertia="0.02 0.02 0.002"/>
               <body name="R_FOOT_P" pos="0 0 -0.4">
-                <geom type="mesh" mesh="FOOT_P" conaffinity="0" contype ="0"/>
+                <geom type="mesh" mesh="FOOT_P" conaffinity="0"/>
                 <joint name="R_FOOT_P" type="hinge" axis="0 1 0" range="-60 60"/>
                 <inertial pos="0 0 0" mass="0.5" diaginertia="0.0003 0.0003 0.0003"/>
                 <body name="R_FOOT_R" pos="0 0 0">
                   <!--
                   <geom name="R_FOOT_R" type="mesh" mesh="FOOT_R" conaffinity="0"/>
                   -->
-                  <geom name="R_FOOT_R" type="box" size="0.1 0.05 0.05" conaffinity="1"/>
+                  <geom name="R_FOOT_R" type="box" size="0.1 0.05 0.05" conaffinity="0"/>
                   <joint name="R_FOOT_R" type="hinge" axis="1 0 0" range="-60 60"/>
                   <inertial pos="0 0 0" mass="0.5" diaginertia="0.0003 0.001 0.001"/>
                   <site name="rfsensor"/>
@@ -188,18 +188,18 @@
             <joint name="L_UPPERLEG_P" type="hinge" axis="0 1 0" range="-110 30"/>
             <inertial pos="0 0 -0.15" mass="1.5" diaginertia="0.01 0.01 0.001"/>
             <body name="L_LOWERLEG_P" pos="0 0 -0.3">
-              <geom type="mesh" mesh="LOWERLEG_P" conaffinity="0" contype ="0"/>
+              <geom type="mesh" mesh="LOWERLEG_P" conaffinity="0" />
               <joint name="L_LOWERLEG_P" type="hinge" axis="0 1 0" range="0 140"/>
               <inertial pos="0 0 -0.2" mass="1.5" diaginertia="0.02 0.02 0.002"/>
               <body name="L_FOOT_P" pos="0 0 -0.4">
-                <geom type="mesh" mesh="FOOT_P" conaffinity="0" contype ="0"/>
+                <geom type="mesh" mesh="FOOT_P" conaffinity="0" />
                 <joint name="L_FOOT_P" type="hinge" axis="0 1 0" range="-60 60"/>
                 <inertial pos="0 0 0" mass="0.5" diaginertia="0.0003 0.0003 0.0003"/>
                 <body name="L_FOOT_R" pos="0 0 0">
                   <!--
                   <geom type="mesh" mesh="FOOT_R" conaffinity="0"/>
                   -->
-                  <geom type="box" size="0.1 0.05 0.05" conaffinity="1"/>
+                  <geom type="box" size="0.1 0.05 0.05" conaffinity="0"/>
                   <joint name="L_FOOT_R" type="hinge" axis="1 0 0" range="-60 60"/>
                   <inertial pos="0 0 0" mass="0.5" diaginertia="0.0003 0.001 0.001"/>
                   <site name="lfsensor"/>
