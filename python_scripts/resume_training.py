@@ -24,12 +24,15 @@ ray.init(logging_level="ERROR")
 
 # チェックポイントからアルゴリズムをロード
 print("\n📥 チェックポイントをロード中...")
-NUM_WORKERS = 8 # ← お好みの並列数
+NUM_WORKERS = 16  # i9-7900X (20スレッド) の80%を活用
+NUM_GPUS = 1      # TITAN V を活用
 
 algo = Algorithm.from_checkpoint(
     checkpoint_dir,
     config_overrides={
-        "num_env_runners": NUM_WORKERS,  # 並列数を上書き
+        "num_env_runners": NUM_WORKERS,
+        "num_gpus": NUM_GPUS,
+        "num_cpus_per_env_runner": 1,
     }
 )
 print(f"並列数:")

@@ -125,14 +125,6 @@ except Exception as e:
 finally:
     print("-" * 70)
 
-    # ★★★ close()の前にログを取得 ★★★
-    print("\n📊 制御データを取得中...")
-    try:
-        log = env.get_control_log()
-    except Exception as e:
-        print(f"⚠️ ログ取得エラー: {e}")
-        log = None
-
     env.close()
 
 # 動画保存
@@ -158,17 +150,10 @@ print(f"📊 総フレーム数: {len(frames)}")
 print(f"⏱️  動画の長さ: {len(frames)/OUTPUT_FPS:.1f}秒")
 print(f"🎮 制御周波数: 60fps (sample_controller_mujocoと同じ)")
 print("=" * 70)
-# ★ ログをプロット（既に取得済み）
-if log is not None and len(log.get('time', [])) > 0:
-    print("\n📊 制御データをプロット中...")
-    try:
-        from plot_control_data import plot_control_analysis
-        plot_control_analysis(log)
-    except Exception as e:
-        print(f"⚠️ グラフ生成エラー: {e}")
-        import traceback
-        traceback.print_exc()
-else:
-    print("\n⚠️ ログデータが空です（レンダリングが無効の可能性）")
+print("\n💡 制御データのプロット:")
+print("   CSVファイルが生成されました: control_log.csv")
+print("   プロットする場合は以下を実行してください:")
+print("   python python_scripts/plot_control_data.py")
+print("=" * 70)
 
 print("\n✅ 全処理完了")

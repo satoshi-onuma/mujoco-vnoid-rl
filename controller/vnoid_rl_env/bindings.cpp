@@ -8,6 +8,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <thread>
+#include <fstream>
 
 namespace py = pybind11;
 using namespace cnoid::vnoid;
@@ -38,6 +39,7 @@ private:
     // vnoidのロボットクラス
     std::unique_ptr<MyRobot> robot;
     double previous_x = 0.0;
+    Vector3 prev_com_pos_for_reward;  // 報酬計算用の前回CoM位置
     int frame_skip;
 
     // レンダリング用のオブジェクト（オプショナル）
@@ -54,49 +56,21 @@ private:
     bool scene_initialized = false;
     bool context_initialized = false;
 
-    struct ControlLog {
-        std::vector<double> time;
-        
-        // 実測値
-        std::vector<double> com_pos_x, com_pos_y, com_pos_z;
-        std::vector<double> com_vel_x, com_vel_y, com_vel_z;
-        //std::vector<double> zmp_x, zmp_y, zmp_z;
-        std::vector<double> dcm_x, dcm_y, dcm_z;
-        
-        // 目標値
-        std::vector<double> com_pos_ref_x, com_pos_ref_y, com_pos_ref_z;
-        std::vector<double> zmp_ref_x, zmp_ref_y, zmp_ref_z;
-        std::vector<double> dcm_ref_x, dcm_ref_y, dcm_ref_z;
-        
-        void clear() {
-            time.clear();
-            com_pos_x.clear(); com_pos_y.clear(); com_pos_z.clear();
-            com_vel_x.clear(); com_vel_y.clear(); com_vel_z.clear();
-            //zmp_x.clear(); zmp_y.clear(); zmp_z.clear();
-            dcm_x.clear(); dcm_y.clear(); dcm_z.clear();
-            com_pos_ref_x.clear(); com_pos_ref_y.clear(); com_pos_ref_z.clear();
-            zmp_ref_x.clear(); zmp_ref_y.clear(); zmp_ref_z.clear();
-            dcm_ref_x.clear(); dcm_ref_y.clear(); dcm_ref_z.clear();
-        }
-        
-        void reserve(size_t n) {
-            time.reserve(n);
-            com_pos_x.reserve(n); com_pos_y.reserve(n); com_pos_z.reserve(n);
-            com_vel_x.reserve(n); com_vel_y.reserve(n); com_vel_z.reserve(n);
-            //zmp_x.reserve(n); zmp_y.reserve(n); zmp_z.reserve(n);
-            dcm_x.reserve(n); dcm_y.reserve(n); dcm_z.reserve(n);
-            com_pos_ref_x.reserve(n); com_pos_ref_y.reserve(n); com_pos_ref_z.reserve(n);
-            zmp_ref_x.reserve(n); zmp_ref_y.reserve(n); zmp_ref_z.reserve(n);
-            dcm_ref_x.reserve(n); dcm_ref_y.reserve(n); dcm_ref_z.reserve(n);
-        }
-    };
+    // CSVファイルストリーム
+    std::ofstream csv_file;
+    bool csv_opened = false;
 
-    ControlLog control_log;
-
+    // RLアクション保存用
+    std::array<double, 2> last_rl_action = {0.0, 0.0};
     Vector3 prev_com_pos;
     Vector3 com_vel_actual;
     bool first_step = true;
     bool logging_completed = false;
+    int reset_count = 0;  // reset()が呼ばれた回数
+    
+    // 角運動量の時間微分計算用
+    Vector3 prev_angular_momentum_com = Vector3(0.0, 0.0, 0.0);
+    bool first_log = true;
 
 public:
     
@@ -131,10 +105,44 @@ public:
         
         // ★★★ レンダリングが有効な場合のみOpenGL初期化 ★★★ログも初期化
         if (rendering_enabled) {
-
-            control_log.clear();
-            control_log.reserve(100000);
-            std::cout << "📊 制御データのロギング自動開始" << std::endl;
+            // CSVファイルを開く
+            std::string csv_filename = "control_log.csv";
+            csv_file.open(csv_filename);
+            
+            if (!csv_file.is_open()) {
+                std::cerr << "⚠️ CSVファイルを開けませんでした: " << csv_filename << std::endl;
+                csv_opened = false;
+            } else {
+                csv_opened = true;
+                std::cout << "📝 CSVロギング開始: " << csv_filename << std::endl;
+                
+                // ヘッダー行を書き込む
+                csv_file << "time,"
+                         << "com_pos_x,com_pos_y,com_pos_z,"
+                         << "com_pos_ref_x,com_pos_ref_y,com_pos_ref_z,"
+                         << "com_vel_x,com_vel_y,com_vel_z,"
+                         << "zmp_ref_x,zmp_ref_y,"
+                         << "dcm_x,dcm_y,dcm_z,"
+                         << "dcm_ref_x,dcm_ref_y,dcm_ref_z,"
+                         << "dcm_offset_actual_x,dcm_offset_actual_y,"
+                         << "dcm_offset_desired_x,dcm_offset_desired_y,"
+                         << "obs_angvel_x,obs_angvel_y,obs_angvel_z,"
+                         << "obs_foot_sink_left,obs_foot_sink_right,"
+                         << "obs_contact_left,obs_contact_right,"
+                         << "rl_action_foot_offset_x,rl_action_foot_offset_y,"
+                         << "base_angle_roll,base_angle_pitch,base_angle_yaw,"
+                         << "base_angle_ref_roll,base_angle_ref_pitch,base_angle_ref_yaw,"
+                         << "recovery_moment_desired_x,recovery_moment_desired_y,recovery_moment_desired_z,"
+                         << "angular_moment_x,angular_moment_y,angular_moment_z,"
+                         << "moment_diff_x,moment_diff_y,moment_diff_z,"
+                         << "zmp_local_x,zmp_local_y,zmp_local_z,"
+                         << "obs_ori_w,obs_ori_x,obs_ori_y,obs_ori_z,"
+                         << "obs_acc_x,obs_acc_y,obs_acc_z,"
+                         << "obs_foot_height_left,obs_foot_height_right"
+                         << std::endl;
+                
+                csv_file.flush();  // 即座に書き込む
+            }
 
             try {
                 initializeGLFW();
@@ -164,6 +172,7 @@ public:
         previous_x = d->qpos[0];
 
         prev_com_pos = Vector3(0.0, 0.0, 0.0);
+        prev_com_pos_for_reward = Vector3(0.0, 0.0, 0.0);
         com_vel_actual = Vector3(0.0, 0.0, 0.0);
         first_step = true;
         
@@ -171,46 +180,28 @@ public:
     }
 
     ~VnoidEnv() {
+        // CSVファイルを閉じる
+        if (csv_opened) {
+            csv_file.close();
+            std::cout << "✅ CSVファイル保存完了: control_log.csv" << std::endl;
+        }
+        
         cleanup();
     }
 
 
-        py::dict get_control_log() {
+    // ★ ログ取得メソッドはCSVファイルから読み込む必要がある場合は削除
+    // CSVファイルは外部スクリプトで読み込むことを想定
+    py::dict get_control_log() {
         py::dict log;
-        
-        log["time"] = control_log.time;
-        
-        // 実測値
-        log["com_pos_x"] = control_log.com_pos_x;
-        log["com_pos_y"] = control_log.com_pos_y;
-        log["com_pos_z"] = control_log.com_pos_z;
-        log["com_vel_x"] = control_log.com_vel_x;
-        log["com_vel_y"] = control_log.com_vel_y;
-        log["com_vel_z"] = control_log.com_vel_z;
-        //log["zmp_x"] = control_log.zmp_x;
-        //log["zmp_y"] = control_log.zmp_y;
-        //log["zmp_z"] = control_log.zmp_z;
-        log["dcm_x"] = control_log.dcm_x;
-        log["dcm_y"] = control_log.dcm_y;
-        //log["dcm_z"] = control_log.dcm_z;
-        
-        // 目標値
-        log["com_pos_ref_x"] = control_log.com_pos_ref_x;
-        log["com_pos_ref_y"] = control_log.com_pos_ref_y;
-        log["com_pos_ref_z"] = control_log.com_pos_ref_z;
-        log["zmp_ref_x"] = control_log.zmp_ref_x;
-        log["zmp_ref_y"] = control_log.zmp_ref_y;
-        //log["zmp_ref_z"] = control_log.zmp_ref_z;
-        log["dcm_ref_x"] = control_log.dcm_ref_x;
-        log["dcm_ref_y"] = control_log.dcm_ref_y;
-        //log["dcm_ref_z"] = control_log.dcm_ref_z;
-        
+        // CSVファイルから読み込む機能は実装しない（外部スクリプトで処理）
+        // 後方互換性のため空の辞書を返す
         return log;
     }
     
-    // ★ ログをクリアするメソッド
+    // ★ ログをクリアするメソッド（CSVファイルは削除しない）
     void clear_control_log() {
-        control_log.clear();
+        // CSVファイルは削除しない（外部で管理）
     }
 
 
@@ -257,22 +248,44 @@ public:
     }
 
     double compute_reward() {
-        double current_x = d->qpos[0];
+        if (!robot) {
+            return 0.0;
+        }
+        
+        // 現在のCoM位置を取得
+        Vector3 current_com_pos = robot->centroid.com_pos;
+        
+        // 初回は前方向報酬を0にする
+        double forward_reward = 0.0;
+        if (prev_com_pos_for_reward.norm() > 1e-6) {  // 前回の位置が有効な場合
+            // 絶対座標での移動ベクトル
+            Vector3 delta_global = current_com_pos - prev_com_pos_for_reward;
+            
+            // ロボットのローカル座標系に変換（クォータニオンの逆変換）
+            // ローカル座標系での前方向はMuJoCoではx方向
+            Vector3 delta_local = robot->base.ori.conjugate() * delta_global;
+            
+            // ローカル座標系での前方向（x方向）の成分を取得
+            forward_reward = delta_local.x();
+        }
+        
+        /*
+         double current_x = d->qpos[0];
         double forward_reward = current_x - previous_x;
+        */
         double healthy_reward = 1.0;
         double total_reward = forward_reward * 5.0 + healthy_reward;
     
         // ★デバッグログ
-        std::cout << "[REWARD] current_x=" << current_x 
-                 << " | prev_x=" << previous_x 
-                << " | forward=" << forward_reward 
+        std::cout << "[REWARD] forward_reward=" << forward_reward 
                  << " | total=" << total_reward << std::endl;
 
         //ここで返してるトータルリワードとPython側で受け取ってるRewardの値が若干違う
         //並列環境減らすなどして試す
         //現時点では50stepで終わってないほうが凶悪
     
-        previous_x = current_x;
+        // 次回のために現在の位置を保存
+        prev_com_pos_for_reward = current_com_pos;
         return total_reward;
     }
 
@@ -324,45 +337,150 @@ private:
         // より正確にはFK計算からcom_velを取得すべき
     }
 
-    void log_control_data() {
-        if (!rendering_enabled|| !robot) return;
+    // ★ 重心周りの角運動量を計算（MuJoCoから取得）
+    Vector3 calc_angular_momentum_around_com() {
+        if (!m || !d || !robot) {
+            return Vector3(0.0, 0.0, 0.0);
+        }
+        mj_subtreeVel(m, d);
+        // MuJoCoのsubtree_angmomを使用
+        // ルートボディ（body ID 0）のsubtree_angmomは全体の角運動量
+        // または、cinert[0]の角運動量成分（3:6）を使用
+        // subtree_angmomは重心周りの角運動量を返す
+        Vector3 angular_momentum;
+        int hips_body_id = 1;  // XMLの<body name="HIPS">に対応
+        
+        // 方法1: subtree_angmomを使用（推奨）
+        // ルートボディ（body ID 0）のサブツリー角運動量 = 全体の角運動量
+        if (m->nbody > hips_body_id && d->subtree_angmom) {
+            // subtree_angmomは各ボディのサブツリー角運動量（3次元ベクトル）
+            // ルートボディ（ID 0）のサブツリーが全体なので、それを使用
+            angular_momentum = Vector3(
+                d->subtree_angmom[3*hips_body_id],
+                d->subtree_angmom[3*hips_body_id+1],
+                d->subtree_angmom[3*hips_body_id+2]
+            );
 
-        if (logging_completed) {
-            return;
+                    // デバッグ出力（最初の数回だけ）
+        static int debug_count = 0;
+        if (debug_count++ < 5) {
+            std::cout << "Angular momentum [" << debug_count << "]: ["
+                      << angular_momentum.x() << ", "
+                      << angular_momentum.y() << ", "
+                      << angular_momentum.z() << "]" << std::endl;
+        }
+        }
+        else {
+            angular_momentum = Vector3(0.0, 0.0, 0.0);
         }
         
-        // CoM速度を計算（キャッシュされる）
+        return angular_momentum;
+    }
+
+    void log_control_data() {
+        if (!rendering_enabled || !robot || !csv_opened || logging_completed) return;
+        
+        // CoM速度を計算
         Vector3 com_vel = calc_com_velocity();
 
         // DCM実測値を計算
         Vector3 dcm_actual = calc_dcm_actual();
         
-        control_log.time.push_back(robot->timer.time);
+        double time = robot->timer.time;
         
-        // 実測値
-        control_log.com_pos_x.push_back(robot->centroid.com_pos.x());
-        control_log.com_pos_y.push_back(robot->centroid.com_pos.y());
-        control_log.com_pos_z.push_back(robot->centroid.com_pos.z());
-        control_log.com_vel_x.push_back(com_vel.x());
-        control_log.com_vel_y.push_back(com_vel.y());
-        control_log.com_vel_z.push_back(com_vel.z());
-        //control_log.zmp_x.push_back(robot->centroid.zmp.x());
-        //control_log.zmp_y.push_back(robot->centroid.zmp.y());
-        //control_log.zmp_z.push_back(robot->centroid.zmp.z());
-        control_log.dcm_x.push_back(dcm_actual.x());
-        control_log.dcm_y.push_back(dcm_actual.y());
-        //control_log.dcm_z.push_back(dcm_actual.z());
+        // DCM Offset計算
+        int support = robot->footstep_buffer.steps[0].side;
+        double dcm_offset_actual_x = dcm_actual.x() - robot->foot[support].pos.x();
+        double dcm_offset_actual_y = dcm_actual.y() - robot->foot[support].pos.y();
         
-        // 目標値
-        control_log.com_pos_ref_x.push_back(robot->centroid.com_pos_ref.x());
-        control_log.com_pos_ref_y.push_back(robot->centroid.com_pos_ref.y());
-        control_log.com_pos_ref_z.push_back(robot->centroid.com_pos_ref.z());
-        control_log.zmp_ref_x.push_back(robot->centroid.zmp_ref.x());
-        control_log.zmp_ref_y.push_back(robot->centroid.zmp_ref.y());
-        //control_log.zmp_ref_z.push_back(robot->centroid.zmp_ref.z());
-        control_log.dcm_ref_x.push_back(robot->centroid.dcm_ref.x());
-        control_log.dcm_ref_y.push_back(robot->centroid.dcm_ref.y());
-        //control_log.dcm_ref_z.push_back(robot->centroid.dcm_ref.z());
+        double dcm_offset_desired_x = 0.0;
+        double dcm_offset_desired_y = 0.0;
+        if (robot->footstep.steps.size() >= 2) {
+            const Step& st1 = robot->footstep.steps[1];
+            int swg = !st1.side;
+            dcm_offset_desired_x = st1.dcm.x() - st1.foot_pos[swg].x();
+            dcm_offset_desired_y = st1.dcm.y() - st1.foot_pos[swg].y();
+        }
+        
+        // 観測値
+        double left_foot_sink = robot->foot[0].pos[2] - robot->foot[0].pos_ref[2];
+        double right_foot_sink = robot->foot[1].pos[2] - robot->foot[1].pos_ref[2];
+        
+        // 回復モーメントの所望量を計算（stabilizer.cppのCalcDcmDynamicsと同じ計算）
+        Vector3 theta = robot->base.angle - robot->base.angle_ref;
+        Vector3 omega = robot->base.angvel - robot->base.angvel_ref;
+        Vector3 omegadd_local(
+            -(robot->stabilizer.orientation_ctrl_gain_p*theta.x() + robot->stabilizer.orientation_ctrl_gain_d*omega.x()),
+            -(robot->stabilizer.orientation_ctrl_gain_p*theta.y() + robot->stabilizer.orientation_ctrl_gain_d*omega.y()),
+            0.0
+        );
+        Vector3 Ld_local(
+            robot->param.nominal_inertia.x()*omegadd_local.x(),
+            robot->param.nominal_inertia.y()*omegadd_local.y(),
+            robot->param.nominal_inertia.z()*omegadd_local.z()
+        );
+        // limit recovery moment for safety
+        for(int i = 0; i < 3; i++){
+            Ld_local[i] = std::min(std::max(-robot->stabilizer.recovery_moment_limit, Ld_local[i]), robot->stabilizer.recovery_moment_limit);
+        }
+        
+        // 重心周りの角運動量を計算（MuJoCoから取得）
+        Vector3 angular_momentum_com = calc_angular_momentum_around_com();
+        
+        // 角運動量の時間微分を計算（モーメント）
+        Vector3 angular_moment = Vector3(0.0, 0.0, 0.0);
+        double dt = robot->timer.dt;
+        if (!first_log && dt > 1e-6) {
+            angular_moment = (angular_momentum_com - prev_angular_momentum_com) / dt;
+        }
+        prev_angular_momentum_com = angular_momentum_com;
+        if (first_log) first_log = false;
+        
+        // 回復モーメントとの差を計算（ローカル座標系）
+        Vector3 moment_diff = angular_moment - Ld_local;
+        
+        // zmp_localを計算（単脚支持時のみ）
+        Vector3 zmp_local = Vector3(0.0, 0.0, 0.0);
+        if ((robot->foot[0].contact_ref && !robot->foot[1].contact_ref) ||
+            (!robot->foot[0].contact_ref && robot->foot[1].contact_ref)) {
+            int sup = robot->foot[0].contact_ref ? 0 : 1;
+            zmp_local = robot->foot[sup].ori_ref.conjugate() * (robot->centroid.zmp_ref - robot->foot[sup].pos_ref);
+        } else if (robot->foot[0].contact_ref && robot->foot[1].contact_ref) {
+            // 両脚支持時は、より接触力が大きい方の足のzmp_localを使用
+            // 簡易的に左足のzmp_localを使用（foot[0].zmp_refは既にローカル座標系）
+            zmp_local = robot->foot[0].zmp_ref;
+        }
+        
+        // CSVに1行書き込む
+        csv_file << time << ","
+                 << robot->centroid.com_pos.x() << "," << robot->centroid.com_pos.y() << "," << robot->centroid.com_pos.z() << ","
+                 << robot->centroid.com_pos_ref.x() << "," << robot->centroid.com_pos_ref.y() << "," << robot->centroid.com_pos_ref.z() << ","
+                 << com_vel.x() << "," << com_vel.y() << "," << com_vel.z() << ","
+                 << robot->centroid.zmp_ref.x() << "," << robot->centroid.zmp_ref.y() << ","
+                 << dcm_actual.x() << "," << dcm_actual.y() << "," << dcm_actual.z() << ","
+                 << robot->centroid.dcm_ref.x() << "," << robot->centroid.dcm_ref.y() << "," << robot->centroid.dcm_ref.z() << ","
+                 << dcm_offset_actual_x << "," << dcm_offset_actual_y << ","
+                 << dcm_offset_desired_x << "," << dcm_offset_desired_y << ","
+                 << robot->base.angvel[0] << "," << robot->base.angvel[1] << "," << robot->base.angvel[2] << ","
+                 << left_foot_sink << "," << right_foot_sink << ","
+                 << (robot->foot[0].contact_ref ? 1.0 : 0.0) << "," << (robot->foot[1].contact_ref ? 1.0 : 0.0) << ","
+                 << last_rl_action[0] << "," << last_rl_action[1] << ","
+                 << robot->base.angle.x() << "," << robot->base.angle.y() << "," << robot->base.angle.z() << ","
+                 << robot->base.angle_ref.x() << "," << robot->base.angle_ref.y() << "," << robot->base.angle_ref.z() << ","
+                 << Ld_local.x() << "," << Ld_local.y() << "," << Ld_local.z() << ","
+                 << angular_moment.x() << "," << angular_moment.y() << "," << angular_moment.z() << ","
+                 << moment_diff.x() << "," << moment_diff.y() << "," << moment_diff.z() << ","
+                 << zmp_local.x() << "," << zmp_local.y() << "," << zmp_local.z() << ","
+                 << robot->base.ori.w() << "," << robot->base.ori.x() << "," << robot->base.ori.y() << "," << robot->base.ori.z() << ","
+                 << robot->base.acc[0] << "," << robot->base.acc[1] << "," << robot->base.acc[2] << ","
+                 << robot->foot[0].pos_ref[2] << "," << robot->foot[1].pos_ref[2]
+                 << std::endl;
+        
+        // 定期的にflush（例：100回に1回）
+        static int log_count = 0;
+        if (++log_count % 100 == 0) {
+            csv_file.flush();
+        }
     }
     
 
@@ -462,10 +580,14 @@ public:
             throw std::runtime_error("環境が初期化されていません。");
         }
 
-        if (!control_log.time.empty() && !logging_completed) {
+        // 最初のエピソードが終わったらロギングを停止してCSVファイルを閉じる
+        // reset_count == 1 なら、これは2回目のreset（最初のエピソード終了後）
+        reset_count++;
+        if (!logging_completed && csv_opened && reset_count == 2) {
             logging_completed = true;
-            std::cout << "✅ 最初のエピソード完了、ロギング停止（" 
-                  << control_log.time.size() << "サンプル）" << std::endl;
+            csv_file.close();
+            csv_opened = false;
+            std::cout << "✅ 最初のエピソード完了、CSVロギング停止・ファイル保存完了: control_log.csv" << std::endl;
         }
     
         // データを完全に削除して再作成
@@ -483,7 +605,12 @@ public:
         // ★ CoM速度計算をリセット
         first_step = true;
         prev_com_pos = Vector3(0.0, 0.0, 0.0);
+        prev_com_pos_for_reward = Vector3(0.0, 0.0, 0.0);
         com_vel_actual = Vector3(0.0, 0.0, 0.0);
+        
+        // ★ 角運動量の時間微分計算をリセット
+        first_log = true;
+        prev_angular_momentum_com = Vector3(0.0, 0.0, 0.0);
     
         return get_observation();
     }
@@ -503,6 +630,11 @@ public:
         }
         
         double* ptr = static_cast<double*>(buf.ptr);
+        
+        // RLアクションを保存
+        last_rl_action[0] = ptr[0];
+        last_rl_action[1] = ptr[1];
+        
         RLParams rl_params;
          
         // actionから設定

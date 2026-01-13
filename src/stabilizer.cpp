@@ -160,7 +160,7 @@ void Stabilizer::CalcDcmDynamics(const Timer& timer, const Param& param, const B
 
 	// desired angular acceleration for regulating orientation (in local coordinate)
 	Vector3 omegadd_local(
-		-(orientation_ctrl_gain_p*theta.x() + orientation_ctrl_gain_d*omega.x()),
+		-(orientation_ctrl_gain_p*theta.x() + orientation_ctrl_gain_d*omega.x()),//yawregulationは用いられていない
 		-(orientation_ctrl_gain_p*theta.y() + orientation_ctrl_gain_d*omega.y()),
 		//-(orientation_ctrl_gain_p*theta.z() + orientation_ctrl_gain_d*omega.z())
 		0.0
@@ -205,6 +205,7 @@ void Stabilizer::CalcDcmDynamics(const Timer& timer, const Param& param, const B
 	// update DCM
 	centroid.dcm_ref += dcm_d*timer.dt;
 	// limit deviation from reference dcm
+	//ここの範囲を狭めたら転倒回避できる可能性ある
 	for(int j = 0; j < 3; j++){
 		centroid.dcm_ref[j] = std::min(std::max(centroid.dcm_target[j] - dcm_deviation_limit, centroid.dcm_ref[j]), centroid.dcm_target[j] + dcm_deviation_limit);
 	}
