@@ -38,27 +38,26 @@ config = (
     .env_runners(
         num_env_runners=NUM_WORKERS,
         rollout_fragment_length=50,  # ★ 適度な長さ
-        sample_timeout_s=700.0,      # ★ 余裕を持たせる
+        sample_timeout_s=2000.0,      # ★ 余裕を持たせる
     )
     .framework("torch")
     .training(
-        train_batch_size=1600, 
+        train_batch_size=800, 
         lr=1e-4,
         gamma=0.99,
         lambda_=0.95,
         clip_param=0.2,
         entropy_coeff=0.0,
-        num_sgd_iter=8,
+        num_epochs=12,  # ★ num_sgd_iterから変更
     )
     .resources(
         num_gpus=NUM_GPUS,  # ★ TITAN V を活用
-        num_cpus_per_env_runner=1,  # 各環境に1CPU割り当て
     )
     .debugging(seed=42)
 )
 
 # sgd_minibatch_sizeは別途設定
-config.sgd_minibatch_size = 1024
+config.sgd_minibatch_size = 200
 
 print("\n📚 アルゴリズム構築中...")
 algo = config.build()
@@ -68,10 +67,10 @@ print("✅ アルゴリズム構築完了\n")
 checkpoint_dir = os.path.abspath("./humanoid_vnoid_checkpoint")
 
 # 学習統計用のCSV（軽量）
-training_csv_filename = f"training_stats_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
+training_csv_filename = f"training_stats_.csv"
 training_csv = open(training_csv_filename, 'w', newline='')
 training_writer = csv.writer(training_csv)
-training_writer.writerow(['iteration', 'reward_mean', 'sample_time_s', 'learn_time_s', 'elapsed_time_s'])
+training_writer.writerow(['iteration', 'reward_mean', 'sample_time_s', 'learn_time_s', 'elapsed_time_s', 'iter_time_s'])
 
 start_time = time.time()
 
@@ -79,7 +78,7 @@ print("🎓 学習開始...")
 print("-" * 70)
 
 
-for i in range(100):
+for i in range(50):
     result = algo.train()
     
     # 報酬取得
@@ -99,14 +98,19 @@ for i in range(100):
         learn_time = result.get("timers", {}).get("learn_time_ms", 0.0) / 1000.0
     except (KeyError, AttributeError):
         learn_time = 0.0
+
+    try:
+        iter_time = result.get("time_this_iter_s", 0.0)
+    except (KeyError, AttributeError):
+        iter_time = 0.0
     
     elapsed = time.time() - start_time
     
     # ★ Iteration統計をCSVに書き込む（軽量）
-    training_writer.writerow([i, reward, sample_time, learn_time, elapsed])
+    training_writer.writerow([i, reward, sample_time, learn_time, elapsed,iter_time])
     training_csv.flush()  # 即座に書き込み
     
-    print(f"Iteration {i+1:3d} | Mean Reward: {reward:8.2f} | Sample: {sample_time:6.2f}s | Learn: {learn_time:6.2f}s | Elapsed: {elapsed:8.2f}s")
+    print(f"Iteration {i+1:3d} | Mean Reward: {reward:8.2f} | Sample: {sample_time:6.2f}s | Learn: {learn_time:6.2f}s | Elapsed: {elapsed:8.2f}s | Iter: {iter_time:6.2f}s")
 
     # 10イテレーションごとにチェックポイント保存
     if (i + 1) % 10 == 0:

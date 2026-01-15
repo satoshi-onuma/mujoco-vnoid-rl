@@ -127,8 +127,8 @@ public:
                          << "dcm_offset_actual_x,dcm_offset_actual_y,"
                          << "dcm_offset_desired_x,dcm_offset_desired_y,"
                          << "obs_angvel_x,obs_angvel_y,obs_angvel_z,"
-                         << "obs_foot_sink_left,obs_foot_sink_right,"
-                         << "obs_contact_left,obs_contact_right,"
+                         << "obs_foot_sink_right,obs_foot_sink_left,"
+                         << "obs_contact_right,obs_contact_left,"
                          << "rl_action_foot_offset_x,rl_action_foot_offset_y,"
                          << "base_angle_roll,base_angle_pitch,base_angle_yaw,"
                          << "base_angle_ref_roll,base_angle_ref_pitch,base_angle_ref_yaw,"
@@ -138,7 +138,7 @@ public:
                          << "zmp_local_x,zmp_local_y,zmp_local_z,"
                          << "obs_ori_w,obs_ori_x,obs_ori_y,obs_ori_z,"
                          << "obs_acc_x,obs_acc_y,obs_acc_z,"
-                         << "obs_foot_height_left,obs_foot_height_right"
+                         << "obs_foot_height_right,obs_foot_height_left"
                          << std::endl;
                 
                 csv_file.flush();  // 即座に書き込む
@@ -227,11 +227,11 @@ public:
         obs.push_back(robot->foot[0].pos_ref[2]);
         obs.push_back(robot->foot[1].pos_ref[2]);
 
-        double left_foot_sink = robot->foot[0].pos[2] - robot->foot[0].pos_ref[2]  ;//実測-予測　予想より下にいたら-,上にいたら+
-        double right_foot_sink = robot->foot[0].pos[2] - robot->foot[1].pos_ref[2] ;//実測足の位置使っているのでここだけジャイロ以外使用
+        double right_foot_sink = robot->foot[0].pos[2] - robot->foot[0].pos_ref[2];  // 実測-予測　予想より下にいたら-,上にいたら+
+        double left_foot_sink = robot->foot[1].pos[2] - robot->foot[1].pos_ref[2];   // 実測足の位置使っているのでここだけジャイロ以外使用
 
-        obs.push_back(left_foot_sink); 
         obs.push_back(right_foot_sink); 
+        obs.push_back(left_foot_sink); 
 
         /*
         DCMの修正した大きさを入れる　デルタ入れたらいい?
@@ -389,9 +389,9 @@ private:
         double time = robot->timer.time;
         
         // DCM Offset計算
-        int support = robot->footstep_buffer.steps[0].side;
-        double dcm_offset_actual_x = dcm_actual.x() - robot->foot[support].pos.x();
-        double dcm_offset_actual_y = dcm_actual.y() - robot->foot[support].pos.y();
+        //int swg = !robot->footstep_buffer.steps[0].side;
+        double dcm_offset_actual_x = dcm_actual.x() - robot->centroid.zmp_ref.x();
+        double dcm_offset_actual_y = dcm_actual.y() - robot->centroid.zmp_ref.y();
         
         double dcm_offset_desired_x = 0.0;
         double dcm_offset_desired_y = 0.0;
@@ -403,8 +403,8 @@ private:
         }
         
         // 観測値
-        double left_foot_sink = robot->foot[0].pos[2] - robot->foot[0].pos_ref[2];
-        double right_foot_sink = robot->foot[1].pos[2] - robot->foot[1].pos_ref[2];
+        double right_foot_sink = robot->foot[0].pos[2] - robot->foot[0].pos_ref[2];
+        double left_foot_sink = robot->foot[1].pos[2] - robot->foot[1].pos_ref[2];
         
         // 回復モーメントの所望量を計算（stabilizer.cppのCalcDcmDynamicsと同じ計算）
         Vector3 theta = robot->base.angle - robot->base.angle_ref;
@@ -462,7 +462,7 @@ private:
                  << dcm_offset_actual_x << "," << dcm_offset_actual_y << ","
                  << dcm_offset_desired_x << "," << dcm_offset_desired_y << ","
                  << robot->base.angvel[0] << "," << robot->base.angvel[1] << "," << robot->base.angvel[2] << ","
-                 << left_foot_sink << "," << right_foot_sink << ","
+                 << right_foot_sink << "," << left_foot_sink << ","
                  << (robot->foot[0].contact_ref ? 1.0 : 0.0) << "," << (robot->foot[1].contact_ref ? 1.0 : 0.0) << ","
                  << last_rl_action[0] << "," << last_rl_action[1] << ","
                  << robot->base.angle.x() << "," << robot->base.angle.y() << "," << robot->base.angle.z() << ","
