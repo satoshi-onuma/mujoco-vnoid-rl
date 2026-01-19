@@ -24,9 +24,14 @@ print("  - OpenGL: 無効（全環境で超高速動作）")
 print("  - 学習アルゴリズム: PPO")
 print("=" * 70)
 
-# Ray初期化
-ray.init(logging_level="ERROR")
 
+# Ray初期化
+if not ray.is_initialized():
+    ray.init(
+        address='auto',  # 既存クラスタを検出
+        logging_level="ERROR",
+        ignore_reinit_error=True
+    )
 
 
 # PPO設定
