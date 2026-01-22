@@ -10,7 +10,7 @@ dist/
 *.mov
 *.avi
 
-
-# 大きなログファイル
-*.csv
-control_log.csv
+# 大きなログファイル（特定のディレクトリのみ）
+RL_2/
+Baseline_2/
+even_tyrrain_2/
