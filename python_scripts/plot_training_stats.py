@@ -158,7 +158,7 @@ def plot_training_stats(data, output_filename="training_stats_plot.png"):
     ax3_sec.set_ylim(np.array(ax3.get_ylim()) / 60)
     
     plt.tight_layout()
-    plt.savefig(output_filename, dpi=150)
+    plt.savefig(output_filename)
     print(f"✅ グラフ保存完了: {output_filename}")
     
     # 図2: 時間の内訳（積み上げ棒グラフ）
@@ -206,8 +206,8 @@ def plot_training_stats(data, output_filename="training_stats_plot.png"):
         plt.legend()
     
     plt.tight_layout()
-    output_filename2 = output_filename.replace('.png', '_breakdown.png')
-    plt.savefig(output_filename2, dpi=150)
+    output_filename2 = output_filename.replace('.pdf', '_breakdown.pdf')
+    plt.savefig(output_filename2)
     print(f"✅ グラフ保存完了: {output_filename2}")
     
     plt.close('all')
@@ -240,7 +240,7 @@ if __name__ == "__main__":
         print_time_statistics(data)
         
         # グラフを生成
-        output_filename = csv_filename.replace('.csv', '_plot.png')
+        output_filename = csv_filename.replace('.csv', '_plot.pdf')
         plot_training_stats(data, output_filename)
         
         print("\n" + "=" * 70)

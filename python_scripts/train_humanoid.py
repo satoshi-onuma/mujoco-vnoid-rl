@@ -15,7 +15,7 @@ print("🚀 Vnoid Humanoid 学習スクリプト")
 print("=" * 70)
 
 # 設定パラメータ
-NUM_WORKERS = 16   # 並列環境数
+NUM_WORKERS = 24   # 並列環境数
 NUM_GPUS = 1
 
 print("設定:")
@@ -47,7 +47,7 @@ config = (
     )
     .framework("torch")
     .training(
-        train_batch_size=800, 
+        train_batch_size=1200, #24*50
         lr=1e-4,
         gamma=0.99,
         lambda_=0.95,
@@ -62,7 +62,7 @@ config = (
 )
 
 # sgd_minibatch_sizeは別途設定
-config.sgd_minibatch_size = 200
+config.sgd_minibatch_size = 300 #24*50/4
 
 print("\n📚 アルゴリズム構築中...")
 algo = config.build()
@@ -83,7 +83,7 @@ print("🎓 学習開始...")
 print("-" * 70)
 
 
-for i in range(50):
+for i in range(30):
     result = algo.train()
     
     # 報酬取得
@@ -114,8 +114,6 @@ for i in range(50):
     # ★ Iteration統計をCSVに書き込む（軽量）
     training_writer.writerow([i, reward, sample_time, learn_time, elapsed,iter_time])
     training_csv.flush()  # 即座に書き込み
-    
-    print(f"Iteration {i+1:3d} | Mean Reward: {reward:8.2f} | Sample: {sample_time:6.2f}s | Learn: {learn_time:6.2f}s | Elapsed: {elapsed:8.2f}s | Iter: {iter_time:6.2f}s")
 
     # 10イテレーションごとにチェックポイント保存
     if (i + 1) % 10 == 0:

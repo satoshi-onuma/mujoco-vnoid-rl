@@ -45,7 +45,6 @@ void SteppingController::Update(const Timer& timer, const Param& param, Footstep
                 // pop step just completed from the footsteps
                 footstep.steps.pop_front();
                 if(footstep.steps.size() == 1){
-		            printf("end of footstep reached\n");
                     return;
 	            }
             }
@@ -117,7 +116,7 @@ void SteppingController::Update(const Timer& timer, const Param& param, Footstep
 
     // landing adjustment based on dcm
     // predict dcm at landing
-    Vector3 land_dcm = (stb0.zmp + offset) + exp(time_to_landing/T)*(centroid.dcm_ref - (stb0.zmp + offset));
+    land_dcm = (stb0.zmp + offset) + exp(time_to_landing/T)*(centroid.dcm_ref - (stb0.zmp + offset));
     
 
     // landing adjustment based on dcm

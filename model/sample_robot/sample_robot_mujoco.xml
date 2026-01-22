@@ -75,7 +75,7 @@
             <inertial pos="0 0 0" mass="0.5" diaginertia="0.0004 0.0004 0.0004"/>
             <body name="R_UPPERARM_R" pos="0 0 0">
               <geom type="mesh" mesh="UPPERARM_R" conaffinity="0"/>
-              <joint name="R_UPPERARM_R" type="hinge" axis="1 0 0" range="-90 90"/>
+              <joint name="R_UPPERARM_R" type="hinge" axis="1 0 0" range="-90 90" />
               <inertial pos="0 0 0" mass="0.5" diaginertia="0.0004 0.0004 0.0004"/>
               <body name="R_UPPERARM_Y" pos="0 0 0">
                 <geom type="mesh" mesh="UPPERARM_Y" conaffinity="0"/>

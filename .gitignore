@@ -10,3 +10,7 @@ dist/
 *.mov
 *.avi
 
+
+# 大きなログファイル
+*.csv
+control_log.csv

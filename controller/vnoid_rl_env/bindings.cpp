@@ -126,6 +126,10 @@ public:
                          << "dcm_ref_x,dcm_ref_y,dcm_ref_z,"
                          << "dcm_offset_actual_x,dcm_offset_actual_y,"
                          << "dcm_offset_desired_x,dcm_offset_desired_y,"
+                         << "support_foot_actual_x,support_foot_actual_y,"
+                         << "next_step_dcm_x,next_step_dcm_y,"
+                         << "next_step_support_foot_x,next_step_support_foot_y,"
+                         << "land_dcm_x,land_dcm_y,land_dcm_z,"
                          << "obs_angvel_x,obs_angvel_y,obs_angvel_z,"
                          << "obs_foot_sink_right,obs_foot_sink_left,"
                          << "obs_contact_right,obs_contact_left,"
@@ -275,11 +279,11 @@ public:
         */
         double healthy_reward = 1.0;
         double total_reward = forward_reward * 5.0 + healthy_reward;
-    
-        // ★デバッグログ
+        /*
+         // ★デバッグログ
         std::cout << "[REWARD] forward_reward=" << forward_reward 
                  << " | total=" << total_reward << std::endl;
-
+        */
         //ここで返してるトータルリワードとPython側で受け取ってるRewardの値が若干違う
         //並列環境減らすなどして試す
         //現時点では50stepで終わってないほうが凶悪
@@ -361,14 +365,15 @@ private:
                 d->subtree_angmom[3*hips_body_id+2]
             );
 
-                    // デバッグ出力（最初の数回だけ）
+            /*
+            // デバッグ出力（最初の数回だけ）
         static int debug_count = 0;
         if (debug_count++ < 5) {
             std::cout << "Angular momentum [" << debug_count << "]: ["
                       << angular_momentum.x() << ", "
                       << angular_momentum.y() << ", "
                       << angular_momentum.z() << "]" << std::endl;
-        }
+            */
         }
         else {
             angular_momentum = Vector3(0.0, 0.0, 0.0);
@@ -389,17 +394,27 @@ private:
         double time = robot->timer.time;
         
         // DCM Offset計算
-        //int swg = !robot->footstep_buffer.steps[0].side;
-        double dcm_offset_actual_x = dcm_actual.x() - robot->centroid.zmp_ref.x();
-        double dcm_offset_actual_y = dcm_actual.y() - robot->centroid.zmp_ref.y();
+        int sup = robot->footstep_buffer.steps[0].side;
+        double support_foot_actual_x = robot->foot[sup].pos[0];
+        double support_foot_actual_y = robot->foot[sup].pos[1];
+        double dcm_offset_actual_x = dcm_actual.x() - support_foot_actual_x;
+        double dcm_offset_actual_y = dcm_actual.y() - support_foot_actual_y;
         
         double dcm_offset_desired_x = 0.0;
         double dcm_offset_desired_y = 0.0;
+        double next_step_dcm_x = 0.0;
+        double next_step_dcm_y = 0.0;
+        double next_step_support_foot_x = 0.0;
+        double next_step_support_foot_y = 0.0;
         if (robot->footstep.steps.size() >= 2) {
             const Step& st1 = robot->footstep.steps[1];
             int swg = !st1.side;
-            dcm_offset_desired_x = st1.dcm.x() - st1.foot_pos[swg].x();
-            dcm_offset_desired_y = st1.dcm.y() - st1.foot_pos[swg].y();
+            next_step_dcm_x = st1.dcm.x();
+            next_step_dcm_y = st1.dcm.y();
+            next_step_support_foot_x = st1.foot_pos[swg].x();
+            next_step_support_foot_y = st1.foot_pos[swg].y();
+            dcm_offset_desired_x = next_step_dcm_x - next_step_support_foot_x;
+            dcm_offset_desired_y = next_step_dcm_y - next_step_support_foot_y;
         }
         
         // 観測値
@@ -461,6 +476,10 @@ private:
                  << robot->centroid.dcm_ref.x() << "," << robot->centroid.dcm_ref.y() << "," << robot->centroid.dcm_ref.z() << ","
                  << dcm_offset_actual_x << "," << dcm_offset_actual_y << ","
                  << dcm_offset_desired_x << "," << dcm_offset_desired_y << ","
+                 << support_foot_actual_x << "," << support_foot_actual_y << ","
+                 << next_step_dcm_x << "," << next_step_dcm_y << ","
+                 << next_step_support_foot_x << "," << next_step_support_foot_y << ","
+                 << robot->stepping_controller.land_dcm.x() << "," << robot->stepping_controller.land_dcm.y() << "," << robot->stepping_controller.land_dcm.z() << ","
                  << robot->base.angvel[0] << "," << robot->base.angvel[1] << "," << robot->base.angvel[2] << ","
                  << right_foot_sink << "," << left_foot_sink << ","
                  << (robot->foot[0].contact_ref ? 1.0 : 0.0) << "," << (robot->foot[1].contact_ref ? 1.0 : 0.0) << ","
@@ -619,11 +638,7 @@ public:
         if (!initialized) {
             throw std::runtime_error("環境が初期化されていません。");
         }
-         // ★★★ デバッグ用のログ出力を追加 ★★★
-        // どのプロセスがstepを呼び出したか確認
-        // C++11のスレッドIDを使って、簡易的にワーカーを識別
-        std::cout << "[Worker " << std::this_thread::get_id() << "] Python step() called." << std::endl;
-        
+        /**/
         auto buf = action.request();
         if (buf.ndim != 1 || buf.size < 2) {
             throw std::runtime_error("アクションの次元またはサイズが不正です。");
@@ -667,7 +682,6 @@ public:
                 double hips_z = d->qpos[2];
                 if (hips_z < MIN_HEIGHT) {
                     terminated = true;
-                    std::cout << "[INFO] Robot fell (height=" << hips_z << ")" << std::endl;
                     break;
                 }
 
@@ -693,11 +707,6 @@ public:
             // 1歩完了を検出
             int current_support_leg = robot->footstep_buffer.steps[0].side;
             step_completed = (current_support_leg != prev_support_leg);
-        
-            if (step_completed) {
-                std::cout << "[INFO] Support leg changed: " << prev_support_leg 
-                        << " -> " << current_support_leg << std::endl;
-            }
 
             step_counter++;
 
@@ -710,7 +719,8 @@ public:
         }
 
         if (step_completed && !terminated) {
-            std::cout << "[INFO] Step completed after " << step_counter << " iterations" << std::endl;
+            //std::cout << "[INFO] Step completed after " << step_counter << " iterations" << std::endl;
+            //24*1/60/0.001=400step/歩　これはdurationの0.4に等しい
         }
 
         py::array_t<double> obs = get_observation();

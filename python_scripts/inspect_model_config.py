@@ -36,7 +36,8 @@ ray.init(logging_level="ERROR")
 # チェックポイントからアルゴリズムをロード
 print("\n📥 チェックポイントをロード中...")
 try:
-    algo = Algorithm.from_checkpoint(checkpoint_dir)
+    algo = Algorithm.from_checkpoint(checkpoint_dir
+    )
     print("✅ ロード完了\n")
 except Exception as e:
     print(f"❌ ロード失敗: {e}")
@@ -156,4 +157,139 @@ print("\n" + "=" * 70)
 print("✅ 設定確認完了")
 print("=" * 70)
 
+# ---------------------------------------------------------
+# 追加: 学習の進捗・時間情報の確認
+# ---------------------------------------------------------
+print("\n" + "=" * 70)
+print("⏱️ 学習進捗・時間の確認 (Internal State)")
+print("=" * 70)
+
+# アルゴリズムの全状態を取得
+state = algo.get_state()
+
+# 1. 内部属性からの取得 (Rayの多くのバージョンで有効な非公式属性)
+# "_time_total_s" は学習の累積時間を保持していることが多いです
+internal_time = getattr(algo, "_time_total_s", None)
+if internal_time is not None:
+    print(f"\n【内部属性 (_time_total_s)】")
+    print(f" 累積学習時間: {internal_time:.2f} 秒 ({internal_time/3600:.2f} 時間)")
+else:
+    print("\n【内部属性】 _time_total_s は見つかりませんでした。")
+
+# 2. Counters (ステップ数などの累積カウンター) の確認
+# Ray 2.x系ではここに 'num_env_steps_sampled' などが含まれます
+if "counters" in state:
+    print("\n【Counters (累積ステップ数など)】")
+    counters = state["counters"]
+    
+    # 主要なカウンターをピックアップして表示
+    target_keys = [
+        "num_env_steps_sampled", 
+        "num_env_steps_sampled_lifetime",
+        "num_agent_steps_sampled",
+        "num_agent_steps_trained"
+    ]
+    
+    found_any = False
+    for key in target_keys:
+        if key in counters:
+            print(f" {key}: {counters[key]}")
+            found_any = True
+            
+    # 特定のキーが見つからない場合は全表示（デバッグ用）
+    if not found_any:
+        print(" 主要なカウンターキーが見つかりません。全countersを表示します:")
+        pprint(counters, width=80, indent=2)
+else:
+    print("\n【Counters】 状態辞書に 'counters' が含まれていません。")
+
+# 3. Timers (処理時間の計測記録) の確認
+# 学習ループ内の各処理にかかった時間などが記録されている場合があります
+if "timers" in state:
+    print("\n【Timers (処理時間統計)】")
+    # 情報量が多い場合があるので、学習時間に関連しそうなものがあれば表示
+    timers = state["timers"]
+    if timers:
+        pprint(timers, width=80, indent=2)
+    else:
+        print(" (空のデータ)")
+
+
+# ---------------------------------------------------------
+# 4. デバッグ: Stateの中身を総点検する（これが一番確実です）
+# ---------------------------------------------------------
+print("\n" + "=" * 70)
+print("🕵️ State辞書のキー総点検")
+print("=" * 70)
+
+state = algo.get_state()
+
+# トップレベルのキーをすべて表示
+print(f"State keys: {list(state.keys())}")
+
+# 【最有力候補】 global_vars (Ray 2.x系の古いチェックポイントはここに情報があることが多い)
+if "global_vars" in state:
+    print("\n【global_vars】 (ここに timesteps_total があるはずです)")
+    pprint(state["global_vars"], width=80, indent=2)
+
+# 【次点】 timesteps
+if "timesteps" in state:
+    print(f"\n【timesteps】: {state['timesteps']}")
+
+# 【次点】 info (統計情報が入ることがある)
+if "info" in state:
+    print("\n【info】")
+    pprint(state["info"], width=80, indent=2)
+
+print("\n" + "=" * 70)
+
+# ---------------------------------------------------------
+# 5. New API Stack専用: MetricsLoggerとIterationの解析
+# ---------------------------------------------------------
+print("\n" + "=" * 70)
+print("🆕 New API Stack データ解析")
+print("=" * 70)
+
+# (1) 学習回数 (Training Iterations)
+# 新しいスタックでは、ここには単純な整数（回数）が入っていることが多いです
+if "training_iteration" in state:
+    print(f"\n【学習回数 (training_iteration)】: {state['training_iteration']}")
+
+# (2) MetricsLogger の中身を確認
+# ここに学習時間 (time_total_s) や 生涯ステップ数 (num_env_steps_sampled_lifetime) が入っています
+if "metrics_logger" in state:
+    print("\n【MetricsLogger (主要統計データ)】")
+    ml_state = state["metrics_logger"]
+    
+    # MetricsLoggerの状態は通常、以下のような辞書構造になっています
+    # {
+    #   "stats": {
+    #       "time_total_s": { ... value ... },
+    #       "num_env_steps_sampled_lifetime": { ... value ... }
+    #   }
+    # }
+    
+    # 構造が深いため、'stats' キー以下を探索します
+    stats = ml_state.get("stats", {})
+    
+    # 時間・ステップ数に関連しそうなキーを探して表示
+    target_metrics = [
+        "time_total_s",
+        "num_env_steps_sampled_lifetime",
+        "num_env_steps_sampled", 
+        "num_agent_steps_sampled_lifetime"
+    ]
+    
+    found_metric = False
+    for key, val in stats.items():
+        # キー名に target_metrics のいずれかが含まれていれば表示
+        if any(t in key for t in target_metrics):
+            print(f" 🔹 {key}: {val}")
+            found_metric = True
+            
+    if not found_metric:
+        print(" (主要なメトリクスが見つかりませんでした。全データを表示します)")
+        pprint(ml_state, width=80, indent=2)
+
+print("\n" + "=" * 70)
 ray.shutdown()

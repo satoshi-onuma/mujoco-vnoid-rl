@@ -99,13 +99,10 @@ class HumanoidVnoidEnv(gym.Env):
             stb1.foot_pos[swg].y() += rl_params.foot_offset.y();
          '''
 
-         print(rl_action)
-
         
         # ★ 1歩完了まで実行（C++側で制御サイクルは1000Hz）
         # C++のstep()は内部でframe_skip回のmj_step()を実行
          obs, reward, terminated, info,frames = self.cpp_env.step(rl_action)
-         print(reward)
          self._step_count += 1
 
          #C++側で出ているrewardの値とPython側で受け取っているrewardの値が違う。

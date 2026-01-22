@@ -66,6 +66,10 @@ def plot_control_analysis(log):
     plt.plot(log['time'], log['dcm_ref_x'], 'r--', label='Ref X')
     plt.plot(log['time'], log['dcm_y'], 'g-', label='Actual Y')
     plt.plot(log['time'], log['dcm_ref_y'], 'g--', label='Ref Y')
+    if has_key('land_dcm_x'):
+        plt.plot(log['time'], log['land_dcm_x'], 'r:', linewidth=2, label='Landing DCM X')
+    if has_key('land_dcm_y'):
+        plt.plot(log['time'], log['land_dcm_y'], 'g:', linewidth=2, label='Landing DCM Y')
     plt.xlabel('Time [s]')
     plt.ylabel('Position [m]')
     plt.title('DCM (Divergent Component of Motion)')
@@ -90,6 +94,8 @@ def plot_control_analysis(log):
     plt.plot(log['zmp_ref_x'], log['zmp_ref_y'], 'r--', label='ZMP Ref')
     plt.plot(log['dcm_x'], log['dcm_y'], 'b-', label='DCM Actual')
     plt.plot(log['dcm_ref_x'], log['dcm_ref_y'], 'b--', label='DCM Ref')
+    if has_key('land_dcm_x') and has_key('land_dcm_y'):
+        plt.plot(log['land_dcm_x'], log['land_dcm_y'], 'm:', linewidth=2, label='Landing DCM')
     plt.xlabel('X [m]')
     plt.ylabel('Y [m]')
     plt.title('ZMP & DCM Trajectory (Top View)')
@@ -98,8 +104,8 @@ def plot_control_analysis(log):
     plt.axis('equal')
     
     plt.tight_layout()
-    plt.savefig('control_analysis.png', dpi=150)
-    print(f"✅ グラフ保存完了: control_analysis.png")
+    plt.savefig('control_analysis.pdf')
+    print(f"✅ グラフ保存完了: control_analysis.pdf")
     
     # 図2: DCM Offset, RL Action, 接触状態（6パネル）
     fig2 = plt.figure(figsize=(15, 10))
@@ -189,8 +195,8 @@ def plot_control_analysis(log):
     plt.grid(True)
     
     plt.tight_layout()
-    plt.savefig('control_analysis_foot.png', dpi=150)
-    print(f"✅ グラフ保存完了: control_analysis_foot.png")
+    plt.savefig('control_analysis_foot.pdf')
+    print(f"✅ グラフ保存完了: control_analysis_foot.pdf")
     
     # 図3: ベース角度と角速度（6パネル）
     fig3 = plt.figure(figsize=(15, 10))
@@ -285,8 +291,8 @@ def plot_control_analysis(log):
     plt.grid(True)
     
     plt.tight_layout()
-    plt.savefig('control_analysis_base.png', dpi=150)
-    print(f"✅ グラフ保存完了: control_analysis_base.png")
+    plt.savefig('control_analysis_base.pdf')
+    print(f"✅ グラフ保存完了: control_analysis_base.pdf")
     
     # 図4: 回復モーメントと角運動量の時間微分（モーメント）（6パネル）
     fig4 = plt.figure(figsize=(15, 10))
@@ -386,8 +392,8 @@ def plot_control_analysis(log):
         plt.grid(True)
     
     plt.tight_layout()
-    plt.savefig('control_analysis_moment.png', dpi=150)
-    print(f"✅ グラフ保存完了: control_analysis_moment.png")
+    plt.savefig('control_analysis_moment.pdf')
+    print(f"✅ グラフ保存完了: control_analysis_moment.pdf")
     
     # 図5: ZMP Local（上限・下限も表示）（3パネル）
     fig5 = plt.figure(figsize=(15, 8))
@@ -436,8 +442,99 @@ def plot_control_analysis(log):
     plt.grid(True)
     
     plt.tight_layout()
-    plt.savefig('control_analysis_zmp_local.png', dpi=150)
-    print(f"✅ グラフ保存完了: control_analysis_zmp_local.png")
+    plt.savefig('control_analysis_zmp_local.pdf')
+    print(f"✅ グラフ保存完了: control_analysis_zmp_local.pdf")
+    
+    # 図6: DCM Offset の計算要素（6パネル）
+    fig6 = plt.figure(figsize=(15, 10))
+    
+    # --- パネル1: DCM Actual と Support Foot (X) ---
+    plt.subplot(3, 2, 1)
+    if has_key('dcm_x'):
+        plt.plot(log['time'], log['dcm_x'], 'b-', label='DCM Actual X', linewidth=2)
+    if has_key('support_foot_actual_x'):
+        plt.plot(log['time'], log['support_foot_actual_x'], 'r--', label='Support Foot Actual X', linewidth=2)
+    plt.xlabel('Time [s]')
+    plt.ylabel('Position [m]')
+    plt.title('DCM Actual vs Support Foot (X)')
+    plt.legend()
+    plt.grid(True)
+    
+    # --- パネル2: DCM Actual と Support Foot (Y) ---
+    plt.subplot(3, 2, 2)
+    if has_key('dcm_y'):
+        plt.plot(log['time'], log['dcm_y'], 'b-', label='DCM Actual Y', linewidth=2)
+    if has_key('support_foot_actual_y'):
+        plt.plot(log['time'], log['support_foot_actual_y'], 'r--', label='Support Foot Actual Y', linewidth=2)
+    plt.xlabel('Time [s]')
+    plt.ylabel('Position [m]')
+    plt.title('DCM Actual vs Support Foot (Y)')
+    plt.legend()
+    plt.grid(True)
+    
+    # --- パネル3: DCM Offset Actual の計算 (X) ---
+    plt.subplot(3, 2, 3)
+    if has_key('dcm_x') and has_key('support_foot_actual_x'):
+        dcm_minus_support_x = np.array(log['dcm_x']) - np.array(log['support_foot_actual_x'])
+        plt.plot(log['time'], dcm_minus_support_x, 'g-', label='DCM - Support Foot', linewidth=2)
+    if has_key('dcm_offset_actual_x'):
+        plt.plot(log['time'], log['dcm_offset_actual_x'], 'r--', label='DCM Offset Actual (直接計算)', linewidth=2)
+    plt.xlabel('Time [s]')
+    plt.ylabel('Offset [m]')
+    plt.title('DCM Offset Actual Calculation (X)')
+    plt.legend()
+    plt.grid(True)
+    
+    # --- パネル4: DCM Offset Actual の計算 (Y) ---
+    plt.subplot(3, 2, 4)
+    if has_key('dcm_y') and has_key('support_foot_actual_y'):
+        dcm_minus_support_y = np.array(log['dcm_y']) - np.array(log['support_foot_actual_y'])
+        plt.plot(log['time'], dcm_minus_support_y, 'g-', label='DCM - Support Foot', linewidth=2)
+    if has_key('dcm_offset_actual_y'):
+        plt.plot(log['time'], log['dcm_offset_actual_y'], 'r--', label='DCM Offset Actual (直接計算)', linewidth=2)
+    plt.xlabel('Time [s]')
+    plt.ylabel('Offset [m]')
+    plt.title('DCM Offset Actual Calculation (Y)')
+    plt.legend()
+    plt.grid(True)
+    
+    # --- パネル5: DCM Offset Desired の計算要素 (X) ---
+    plt.subplot(3, 2, 5)
+    if has_key('next_step_dcm_x'):
+        plt.plot(log['time'], log['next_step_dcm_x'], 'b-', label='Next Step DCM X', linewidth=2)
+    if has_key('next_step_support_foot_x'):
+        plt.plot(log['time'], log['next_step_support_foot_x'], 'r--', label='Next Support Foot X', linewidth=2)
+    if has_key('next_step_dcm_x') and has_key('next_step_support_foot_x'):
+        next_offset_x = np.array(log['next_step_dcm_x']) - np.array(log['next_step_support_foot_x'])
+        plt.plot(log['time'], next_offset_x, 'g:', label='Next DCM - Next Support', linewidth=2)
+    if has_key('dcm_offset_desired_x'):
+        plt.plot(log['time'], log['dcm_offset_desired_x'], 'm-.', label='DCM Offset Desired (直接計算)', linewidth=2)
+    plt.xlabel('Time [s]')
+    plt.ylabel('Position/Offset [m]')
+    plt.title('DCM Offset Desired Calculation (X)')
+    plt.legend()
+    plt.grid(True)
+    
+    # --- パネル6: DCM Offset Desired の計算要素 (Y) ---
+    plt.subplot(3, 2, 6)
+    if has_key('next_step_dcm_y'):
+        plt.plot(log['time'], log['next_step_dcm_y'], 'b-', label='Next Step DCM Y', linewidth=2)
+    if has_key('next_step_support_foot_y'):
+        plt.plot(log['time'], log['next_step_support_foot_y'], 'r--', label='Next Support Foot Y', linewidth=2)
+    if has_key('next_step_dcm_y') and has_key('next_step_support_foot_y'):
+        next_offset_y = np.array(log['next_step_dcm_y']) - np.array(log['next_step_support_foot_y'])
+        plt.plot(log['time'], next_offset_y, 'g:', label='Next DCM - Next Support', linewidth=2)
+    if has_key('dcm_offset_desired_y'):
+        plt.plot(log['time'], log['dcm_offset_desired_y'], 'm-.', label='DCM Offset Desired (直接計算)', linewidth=2)
+    plt.xlabel('Time [s]')
+    plt.ylabel('Position/Offset [m]')
+    plt.title('DCM Offset Desired Calculation (Y)')
+    plt.legend()
+    plt.grid(True)
+    
+    plt.tight_layout()
+    plt.savefig('control_analysis_dcm_offset_components.pdf')
+    print(f"✅ グラフ保存完了: control_analysis_dcm_offset_components.pdf")
     
     plt.show()
 
@@ -464,6 +561,121 @@ def load_csv_log(csv_filename="control_log.csv"):
     print(f"✅ CSVファイル読み込み完了: {csv_filename} ({len(log.get('time', []))} サンプル)")
     return log
 
+
+def plot_dcm_offset_analysis(log):
+    """DCMオフセットの計算要素を詳細にプロット"""
+    
+    if len(log['time']) == 0:
+        print("⚠️ ログデータが空です")
+        return
+    
+    print(f"\n📊 DCMオフセット分析グラフ生成中... ({len(log['time'])} サンプル)")
+    
+    # データの存在チェック用ヘルパー関数
+    def has_key(key):
+        return key in log and len(log[key]) > 0
+    
+    # 図: DCMオフセット分析（6パネル）
+    fig = plt.figure(figsize=(18, 12))
+    
+    # --- パネル1: DCMオフセット（Actual） ---
+    plt.subplot(3, 2, 1)
+    if has_key('dcm_offset_actual_x') and has_key('dcm_offset_actual_y'):
+        plt.plot(log['time'], log['dcm_offset_actual_x'], 'r-', label='Actual X', linewidth=2)
+        plt.plot(log['time'], log['dcm_offset_actual_y'], 'g-', label='Actual Y', linewidth=2)
+    plt.xlabel('Time [s]', fontsize=12)
+    plt.ylabel('Offset [m]', fontsize=12)
+    plt.title('DCM Offset (Actual)\nDCM - Support Foot', fontsize=14, fontweight='bold')
+    plt.legend(fontsize=10)
+    plt.grid(True, alpha=0.3)
+    
+    # --- パネル2: DCMオフセット（Desired） ---
+    plt.subplot(3, 2, 2)
+    if has_key('dcm_offset_desired_x') and has_key('dcm_offset_desired_y'):
+        plt.plot(log['time'], log['dcm_offset_desired_x'], 'r--', label='Desired X', linewidth=2)
+        plt.plot(log['time'], log['dcm_offset_desired_y'], 'g--', label='Desired Y', linewidth=2)
+    plt.xlabel('Time [s]', fontsize=12)
+    plt.ylabel('Offset [m]', fontsize=12)
+    plt.title('DCM Offset (Desired)\nNext Step DCM - Next Support Foot', fontsize=14, fontweight='bold')
+    plt.legend(fontsize=10)
+    plt.grid(True, alpha=0.3)
+    
+    # --- パネル3: Actual計算要素（X方向） ---
+    plt.subplot(3, 2, 3)
+    if has_key('dcm_x') and has_key('support_foot_actual_x'):
+        plt.plot(log['time'], log['dcm_x'], 'r-', label='DCM Actual X', linewidth=2)
+        plt.plot(log['time'], log['support_foot_actual_x'], 'b--', label='Support Foot X', linewidth=2)
+        if has_key('dcm_offset_actual_x'):
+            # オフセットを表示（差分）
+            offset = np.array(log['dcm_x']) - np.array(log['support_foot_actual_x'])
+            plt.fill_between(log['time'], log['support_foot_actual_x'], log['dcm_x'], 
+                           alpha=0.3, label='Offset (DCM - Support)', color='orange')
+    plt.xlabel('Time [s]', fontsize=12)
+    plt.ylabel('Position [m]', fontsize=12)
+    plt.title('Actual DCM Offset Components (X)\nDCM_x - Support_Foot_x', fontsize=14, fontweight='bold')
+    plt.legend(fontsize=10)
+    plt.grid(True, alpha=0.3)
+    
+    # --- パネル4: Actual計算要素（Y方向） ---
+    plt.subplot(3, 2, 4)
+    if has_key('dcm_y') and has_key('support_foot_actual_y'):
+        plt.plot(log['time'], log['dcm_y'], 'g-', label='DCM Actual Y', linewidth=2)
+        plt.plot(log['time'], log['support_foot_actual_y'], 'b--', label='Support Foot Y', linewidth=2)
+        if has_key('dcm_offset_actual_y'):
+            # オフセットを表示（差分）
+            offset = np.array(log['dcm_y']) - np.array(log['support_foot_actual_y'])
+            plt.fill_between(log['time'], log['support_foot_actual_y'], log['dcm_y'], 
+                           alpha=0.3, label='Offset (DCM - Support)', color='orange')
+    plt.xlabel('Time [s]', fontsize=12)
+    plt.ylabel('Position [m]', fontsize=12)
+    plt.title('Actual DCM Offset Components (Y)\nDCM_y - Support_Foot_y', fontsize=14, fontweight='bold')
+    plt.legend(fontsize=10)
+    plt.grid(True, alpha=0.3)
+    
+    # --- パネル5: Desired計算要素（X方向） ---
+    plt.subplot(3, 2, 5)
+    if has_key('next_step_dcm_x') and has_key('next_step_support_foot_x'):
+        plt.plot(log['time'], log['next_step_dcm_x'], 'r-', label='Next Step DCM X', linewidth=2)
+        plt.plot(log['time'], log['next_step_support_foot_x'], 'b--', label='Next Support Foot X', linewidth=2)
+        # オフセットを表示（差分）
+        offset = np.array(log['next_step_dcm_x']) - np.array(log['next_step_support_foot_x'])
+        plt.fill_between(log['time'], log['next_step_support_foot_x'], log['next_step_dcm_x'], 
+                       alpha=0.3, label='Offset (Next DCM - Next Support)', color='purple')
+    plt.xlabel('Time [s]', fontsize=12)
+    plt.ylabel('Position [m]', fontsize=12)
+    plt.title('Desired DCM Offset Components (X)\nNext_DCM_x - Next_Support_x', fontsize=14, fontweight='bold')
+    plt.legend(fontsize=10)
+    plt.grid(True, alpha=0.3)
+    
+    # --- パネル6: Desired計算要素（Y方向） ---
+    plt.subplot(3, 2, 6)
+    if has_key('next_step_dcm_y') and has_key('next_step_support_foot_y'):
+        plt.plot(log['time'], log['next_step_dcm_y'], 'g-', label='Next Step DCM Y', linewidth=2)
+        plt.plot(log['time'], log['next_step_support_foot_y'], 'b--', label='Next Support Foot Y', linewidth=2)
+        # オフセットを表示（差分）
+        offset = np.array(log['next_step_dcm_y']) - np.array(log['next_step_support_foot_y'])
+        plt.fill_between(log['time'], log['next_step_support_foot_y'], log['next_step_dcm_y'], 
+                       alpha=0.3, label='Offset (Next DCM - Next Support)', color='purple')
+    plt.xlabel('Time [s]', fontsize=12)
+    plt.ylabel('Position [m]', fontsize=12)
+    plt.title('Desired DCM Offset Components (Y)\nNext_DCM_y - Next_Support_y', fontsize=14, fontweight='bold')
+    plt.legend(fontsize=10)
+    plt.grid(True, alpha=0.3)
+    
+    plt.tight_layout()
+    
+    # 保存
+    output_filename = "control_analysis_dcm_offset.png"
+    plt.savefig(output_filename, dpi=150, bbox_inches='tight')
+    print(f"💾 グラフ保存: {output_filename}")
+    
+    output_filename_pdf = "control_analysis_dcm_offset.pdf"
+    plt.savefig(output_filename_pdf, bbox_inches='tight')
+    print(f"💾 グラフ保存: {output_filename_pdf}")
+    
+    plt.show()
+
+
 if __name__ == "__main__":
     print("=" * 70)
     print("📊 制御データのプロット（CSV版）")
@@ -479,6 +691,7 @@ if __name__ == "__main__":
     
     if log is not None and len(log.get('time', [])) > 0:
         plot_control_analysis(log)
+        plot_dcm_offset_analysis(log)
     else:
         print("⚠️ ログデータが空です")
     

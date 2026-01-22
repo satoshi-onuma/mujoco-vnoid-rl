@@ -28,6 +28,7 @@ public:
 
     bool      buffer_ready;
     double    time_to_landing;
+    Vector3   land_dcm;
 
 public:
 	void Update      (const Timer& timer, const Param& param, Footstep& footstep, Footstep& footstep_buffer, Centroid& centroid, Base& base, vector<Foot>& foot,const RLParams& rl_params);
