@@ -257,10 +257,10 @@ public:
         }
         
         // 現在のCoM位置を取得
-        Vector3 current_com_pos = robot->centroid.com_pos;
+        //Vector3 current_com_pos = robot->centroid.com_pos;
         
         // 初回は前方向報酬を0にする
-        double forward_reward = 0.0;
+        /*
         if (prev_com_pos_for_reward.norm() > 1e-6) {  // 前回の位置が有効な場合
             // 絶対座標での移動ベクトル
             Vector3 delta_global = current_com_pos - prev_com_pos_for_reward;
@@ -271,8 +271,12 @@ public:
             
             // ローカル座標系での前方向（x方向）の成分を取得
             forward_reward = delta_local.x();
-        }
-        
+        }        
+        */
+        //double forward_reward = 0.0;
+
+        double current_x = d->qpos[0];
+        double forward_reward = current_x - previous_x; 
         /*
          double current_x = d->qpos[0];
         double forward_reward = current_x - previous_x;
@@ -289,7 +293,8 @@ public:
         //現時点では50stepで終わってないほうが凶悪
     
         // 次回のために現在の位置を保存
-        prev_com_pos_for_reward = current_com_pos;
+        //prev_com_pos_for_reward = current_com_pos;
+        previous_x = current_x;
         return total_reward;
     }
 
@@ -331,11 +336,10 @@ private:
         return com_vel_actual;
     }
 
-    Vector3 calc_dcm_actual() {
+    Vector3 calc_dcm_actual(const Vector3& com_vel) {
         // DCM = CoM_pos + T * CoM_vel
         // T = sqrt(h/g) はLIPMの時定数
         double T = robot->param.T;
-        Vector3 com_vel = calc_com_velocity();
         return robot->centroid.com_pos + T * com_vel;
         // Note: com_velの実測値がない場合はcom_vel_refを使う
         // より正確にはFK計算からcom_velを取得すべき
@@ -385,11 +389,10 @@ private:
     void log_control_data() {
         if (!rendering_enabled || !robot || !csv_opened || logging_completed) return;
         
-        // CoM速度を計算
-        Vector3 com_vel = calc_com_velocity();
 
         // DCM実測値を計算
-        Vector3 dcm_actual = calc_dcm_actual();
+        Vector3 com_vel = calc_com_velocity();
+        Vector3 dcm_actual = calc_dcm_actual(com_vel);
         
         double time = robot->timer.time;
         

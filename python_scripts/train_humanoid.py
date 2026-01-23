@@ -15,7 +15,7 @@ print("🚀 Vnoid Humanoid 学習スクリプト")
 print("=" * 70)
 
 # 設定パラメータ
-NUM_WORKERS = 24   # 並列環境数
+NUM_WORKERS = 16   # 並列環境数
 NUM_GPUS = 1
 
 print("設定:")
@@ -47,7 +47,7 @@ config = (
     )
     .framework("torch")
     .training(
-        train_batch_size=1200, #24*50
+        train_batch_size=800, #16*50
         lr=1e-4,
         gamma=0.99,
         lambda_=0.95,
@@ -62,7 +62,7 @@ config = (
 )
 
 # sgd_minibatch_sizeは別途設定
-config.sgd_minibatch_size = 300 #24*50/4
+config.sgd_minibatch_size = 256 #16*50/4
 
 print("\n📚 アルゴリズム構築中...")
 algo = config.build()
@@ -83,7 +83,7 @@ print("🎓 学習開始...")
 print("-" * 70)
 
 
-for i in range(30):
+for i in range(50):
     result = algo.train()
     
     # 報酬取得

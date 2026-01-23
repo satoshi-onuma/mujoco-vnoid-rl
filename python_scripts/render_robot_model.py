@@ -86,10 +86,10 @@ def create_robot_figure(model, data, output_dir='robot_renders'):
         # レンダリング
         img = render_view(model, data, **view_info['params'])
         
-        # PILで保存
-        output_path = os.path.join(output_dir, f'{view_name}.png')
+        # PILで保存（PDF形式）
+        output_path = os.path.join(output_dir, f'{view_name}.pdf')
         img_pil = Image.fromarray(img)
-        img_pil.save(output_path, dpi=(300, 300))
+        img_pil.save(output_path, 'PDF', resolution=300.0)
         
         saved_files.append(output_path)
         print(f"    ✅ 保存完了: {output_path}")
