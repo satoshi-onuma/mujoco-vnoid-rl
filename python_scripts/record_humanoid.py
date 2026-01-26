@@ -11,6 +11,7 @@ import torch
 from ray.rllib.core.rl_module import RLModule
 from pathlib import Path
 from pprint import pprint
+import csv
 
 from my_humanoid_env import HumanoidVnoidEnv
 
@@ -70,26 +71,29 @@ print("✅ 録画環境作成完了")
 # フレームバッファ
 frames = []
 
+# CSV記録用のリスト
+csv_data = []
+
 print("\n🎥 録画開始...")
 print("-" * 70)
 
 try:
     for i in range(TOTAL_STEPS):
 
-        if i < 2:
-            action = np.zeros(2)  # 何もしない
-        else:
+        #if i < 2:
+            #action = np.zeros(2)  # 何もしない
+        #else:
              # ★ Rayで推論（explore=Falseで決定的行動）
-            obs_batch = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)
+        obs_batch = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)
              # 推論（勾配計算不要）
-            with torch.no_grad():
-                model_outputs = rl_module.forward_inference({"obs": obs_batch})
+        with torch.no_grad():
+            model_outputs = rl_module.forward_inference({"obs": obs_batch})
             
-            action_dist_params = model_outputs["action_dist_inputs"][0].numpy()
+        action_dist_params = model_outputs["action_dist_inputs"][0].numpy()
 
             
-            """
-            RL介入あり
+        """
+        RL介入あり
 
             action = np.clip(
                 action_dist_params[:2],  # 0=mean, 1=log(stddev), [0:1]=use mean, but keep shape=(1,)
@@ -99,19 +103,29 @@ try:
 
             RL介入なし
             action = np.zeros(2)
-            """
+        """
 
             
-            action = np.clip(
-                action_dist_params[:2],  # 0=mean, 1=log(stddev), [0:1]=use mean, but keep shape=(1,)
-                a_min=env.action_space.low,
-                a_max=env.action_space.high,
-            )
+        action = np.zeros(2)
         # ステップ実行
         obs, reward, terminated, truncated, info , step_frames= env.step(action)
 
+        print(f"reward: {reward}")
+
         # ★ 取得したフレームを全て追加
         frames.extend(step_frames)
+
+        # CSV用データを記録
+        csv_row = {
+            'step': i,
+            'reward': reward,
+            'terminated': terminated,
+            'truncated': truncated,
+        }
+        # obsの各要素を列として追加
+        for j, obs_val in enumerate(obs):
+            csv_row[f'obs_{j}'] = obs_val
+        csv_data.append(csv_row)
 
         # エピソード終了時にリセット
         if terminated or truncated:
@@ -146,6 +160,19 @@ print(f"  出力FPS: {OUTPUT_FPS}")
 imageio.mimsave(output_path, frames, fps=OUTPUT_FPS)
 print(f"✅ 動画保存完了: {output_path}")
 
+# CSVファイルを保存
+csv_output_path = "recording_log.csv"
+print(f"\n💾 ログデータを保存中...")
+if csv_data:
+    with open(csv_output_path, 'w', newline='') as csvfile:
+        fieldnames = list(csv_data[0].keys())
+        writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+        writer.writeheader()
+        writer.writerows(csv_data)
+    print(f"✅ ログ保存完了: {csv_output_path}")
+else:
+    print("⚠️ ログデータが空です")
+
 print("\n" + "=" * 70)
 print("🎉 録画完了！")
 print("=" * 70)
@@ -153,6 +180,7 @@ print(f"📹 動画ファイル: {output_path}")
 print(f"📊 総フレーム数: {len(frames)}")
 print(f"⏱️  動画の長さ: {len(frames)/OUTPUT_FPS:.1f}秒")
 print(f"🎮 制御周波数: 60fps (sample_controller_mujocoと同じ)")
+print(f"📝 ログファイル: {csv_output_path} ({len(csv_data)}ステップ)")
 print("=" * 70)
 print("\n💡 制御データのプロット:")
 print("   CSVファイルが生成されました: control_log.csv")

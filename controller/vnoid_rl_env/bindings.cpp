@@ -118,6 +118,7 @@ public:
                 
                 // ヘッダー行を書き込む
                 csv_file << "time,"
+                         << "base_pos_x,"
                          << "com_pos_x,com_pos_y,com_pos_z,"
                          << "com_pos_ref_x,com_pos_ref_y,com_pos_ref_z,"
                          << "com_vel_x,com_vel_y,com_vel_z,"
@@ -471,6 +472,7 @@ private:
         
         // CSVに1行書き込む
         csv_file << time << ","
+                 << d->qpos[0] << ","
                  << robot->centroid.com_pos.x() << "," << robot->centroid.com_pos.y() << "," << robot->centroid.com_pos.z() << ","
                  << robot->centroid.com_pos_ref.x() << "," << robot->centroid.com_pos_ref.y() << "," << robot->centroid.com_pos_ref.z() << ","
                  << com_vel.x() << "," << com_vel.y() << "," << com_vel.z() << ","
@@ -670,7 +672,7 @@ public:
         const int MAX_ITERATIONS = 1000;
         const double MIN_HEIGHT = 0.5;
         bool terminated = false;
-        bool timeout = false;
+        bool truncated = false;
 
         std::vector<py::array_t<unsigned char>> frame_list;
 
@@ -714,8 +716,7 @@ public:
             step_counter++;
 
             if (step_counter  >= MAX_ITERATIONS) {
-                terminated = true;
-                timeout = true;  // タイムアウトフラグをセット
+                truncated = true;  // タイムアウトフラグをセット
                 std::cerr << "[WARNING] Step timeout" << std::endl;
                 break;
             }
@@ -729,11 +730,12 @@ public:
         py::array_t<double> obs = get_observation();
         double reward = compute_reward();
 
-        if (timeout) {
-            reward = -10.0;
+        // 転倒時にペナルティを設定
+        if (terminated) {
+            reward -= 10.0;
         }
         
-        return py::make_tuple(obs, reward, terminated, py::dict(),frame_list);
+        return py::make_tuple(obs, reward, terminated, truncated, py::dict(),frame_list);
     }
 
     

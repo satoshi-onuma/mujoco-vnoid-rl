@@ -25,18 +25,20 @@ def plot_control_analysis(log):
     # 図1: 基本制御データ（6パネル）
     fig1 = plt.figure(figsize=(15, 10))
     
-    # --- パネル1: CoM Position ---
+    # --- パネル1: CoM Position & Base Position ---
     plt.subplot(3, 2, 1)
-    plt.plot(log['time'], log['com_pos_x'], 'r-', label='Actual X')
-    plt.plot(log['time'], log['com_pos_ref_x'], 'r--', label='Ref X')
-    plt.plot(log['time'], log['com_pos_y'], 'g-', label='Actual Y')
-    plt.plot(log['time'], log['com_pos_ref_y'], 'g--', label='Ref Y')
-    plt.plot(log['time'], log['com_pos_z'], 'b-', label='Actual Z')
-    plt.plot(log['time'], log['com_pos_ref_z'], 'b--', label='Ref Z')
+    if has_key('base_pos_x'):
+        plt.plot(log['time'], log['base_pos_x'], 'k-', label='Base X', linewidth=2.5, alpha=0.8)
+    plt.plot(log['time'], log['com_pos_x'], 'r-', label='CoM Actual X')
+    plt.plot(log['time'], log['com_pos_ref_x'], 'r--', label='CoM Ref X')
+    plt.plot(log['time'], log['com_pos_y'], 'g-', label='CoM Actual Y')
+    plt.plot(log['time'], log['com_pos_ref_y'], 'g--', label='CoM Ref Y')
+    plt.plot(log['time'], log['com_pos_z'], 'b-', label='CoM Actual Z')
+    plt.plot(log['time'], log['com_pos_ref_z'], 'b--', label='CoM Ref Z')
     plt.xlabel('Time [s]')
     plt.ylabel('Position [m]')
-    plt.title('CoM Position')
-    plt.legend()
+    plt.title('CoM & Base Position')
+    plt.legend(fontsize=8)
     plt.grid(True)
     
     # --- パネル2: CoM Velocity ---
@@ -76,16 +78,21 @@ def plot_control_analysis(log):
     plt.legend()
     plt.grid(True)
     
-    # --- パネル5: CoM Trajectory (XY平面) ---
+    # --- パネル5: CoM & Base Trajectory (XY平面) ---
     plt.subplot(3, 2, 5)
-    plt.plot(log['com_pos_x'], log['com_pos_y'], 'b-', label='Actual')
-    plt.plot(log['com_pos_ref_x'], log['com_pos_ref_y'], 'b--', label='Ref')
-    plt.plot(log['com_pos_x'][0], log['com_pos_y'][0], 'go', markersize=10, label='Start')
-    plt.plot(log['com_pos_x'][-1], log['com_pos_y'][-1], 'rx', markersize=10, label='End')
+    if has_key('base_pos_x'):
+        # ベース位置は y=0 としてプロット（X方向の移動のみ）
+        plt.plot(log['base_pos_x'], [0]*len(log['base_pos_x']), 'k-', linewidth=2.5, label='Base X', alpha=0.8)
+        plt.plot(log['base_pos_x'][0], 0, 'ko', markersize=10, label='Base Start')
+        plt.plot(log['base_pos_x'][-1], 0, 'kx', markersize=10, label='Base End')
+    plt.plot(log['com_pos_x'], log['com_pos_y'], 'b-', label='CoM Actual')
+    plt.plot(log['com_pos_ref_x'], log['com_pos_ref_y'], 'b--', label='CoM Ref')
+    plt.plot(log['com_pos_x'][0], log['com_pos_y'][0], 'go', markersize=10, label='CoM Start')
+    plt.plot(log['com_pos_x'][-1], log['com_pos_y'][-1], 'rx', markersize=10, label='CoM End')
     plt.xlabel('X [m]')
     plt.ylabel('Y [m]')
-    plt.title('CoM Trajectory (Top View)')
-    plt.legend()
+    plt.title('CoM & Base Trajectory (Top View)')
+    plt.legend(fontsize=8)
     plt.grid(True)
     plt.axis('equal')
     

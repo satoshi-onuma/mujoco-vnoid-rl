@@ -66,6 +66,7 @@ config = (
         num_env_runners=NUM_WORKERS,
         rollout_fragment_length=50,  # ★ 適度な長さ
         sample_timeout_s=2000.0,      # ★ 余裕を持たせる
+        num_cpus_per_env_runner=2,
     )
     .framework("torch")
     .training(

@@ -28,9 +28,9 @@ print("=" * 70)
 # Ray初期化
 if not ray.is_initialized():
     ray.init(
-        address='auto',  # 既存クラスタを検出
+        #address='auto',  # 既存クラスタを検出
         logging_level="ERROR",
-        ignore_reinit_error=True
+        #ignore_reinit_error=True
     )
 
 
@@ -43,11 +43,11 @@ config = (
     .env_runners(
         num_env_runners=NUM_WORKERS,
         rollout_fragment_length=50,  # ★ 適度な長さ
-        sample_timeout_s=2000.0,      # ★ 余裕を持たせる
+        sample_timeout_s=700.0,      # ★ 余裕を持たせる
     )
     .framework("torch")
     .training(
-        train_batch_size=800, #16*50
+        train_batch_size=200, #16*50
         lr=1e-4,
         gamma=0.99,
         lambda_=0.95,
@@ -62,7 +62,7 @@ config = (
 )
 
 # sgd_minibatch_sizeは別途設定
-config.sgd_minibatch_size = 256 #16*50/4
+config.sgd_minibatch_size = 64 #16*50/4
 
 print("\n📚 アルゴリズム構築中...")
 algo = config.build()
@@ -75,7 +75,7 @@ checkpoint_dir = os.path.abspath("./humanoid_vnoid_checkpoint")
 training_csv_filename = f"training_stats_.csv"
 training_csv = open(training_csv_filename, 'w', newline='')
 training_writer = csv.writer(training_csv)
-training_writer.writerow(['iteration', 'reward_mean', 'sample_time_s', 'learn_time_s', 'elapsed_time_s', 'iter_time_s'])
+training_writer.writerow(['iteration', 'reward_mean', 'episode_len_mean', 'sample_time_s', 'learn_time_s', 'elapsed_time_s', 'iter_time_s'])
 
 start_time = time.time()
 
@@ -92,6 +92,13 @@ for i in range(50):
     except KeyError:
         reward = 0.0
         print("can't get reward")
+    
+    # エピソード長取得
+    try:
+        episode_len = result["env_runners"]["episode_len_mean"]
+    except KeyError:
+        episode_len = 0.0
+        print("can't get episode_len")
     
     # タイマー情報取得
     try:
@@ -112,7 +119,7 @@ for i in range(50):
     elapsed = time.time() - start_time
     
     # ★ Iteration統計をCSVに書き込む（軽量）
-    training_writer.writerow([i, reward, sample_time, learn_time, elapsed,iter_time])
+    training_writer.writerow([i, reward, episode_len, sample_time, learn_time, elapsed, iter_time])
     training_csv.flush()  # 即座に書き込み
 
     # 10イテレーションごとにチェックポイント保存

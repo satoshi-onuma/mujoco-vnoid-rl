@@ -21,6 +21,7 @@ def load_training_stats(csv_filename):
     
     iterations = []
     rewards = []
+    episode_lens = []
     sample_times = []
     learn_times = []
     elapsed_times = []
@@ -30,6 +31,7 @@ def load_training_stats(csv_filename):
         for row in reader:
             iterations.append(int(row['iteration']))
             rewards.append(float(row['reward_mean']))
+            episode_lens.append(float(row['episode_len_mean']))
             sample_times.append(float(row['sample_time_s']))
             learn_times.append(float(row['learn_time_s']))
             elapsed_times.append(float(row['elapsed_time_s']))
@@ -43,6 +45,7 @@ def load_training_stats(csv_filename):
     return {
         'iterations': iterations,
         'rewards': rewards,
+        'episode_lens': episode_lens,
         'sample_times': sample_times,
         'learn_times': learn_times,
         'elapsed_times': elapsed_times
@@ -105,17 +108,18 @@ def plot_training_stats(data, output_filename="training_stats_plot.png"):
     
     iterations = data['iterations']
     rewards = data['rewards']
+    episode_lens = data['episode_lens']
     sample_times = data['sample_times']
     learn_times = data['learn_times']
     elapsed_times = data['elapsed_times']
     
     print(f"\n📊 グラフ生成中... ({len(iterations)} イテレーション)")
     
-    # 図1: 報酬変化と計算時間（3パネル）
-    fig1 = plt.figure(figsize=(15, 10))
+    # 図1: 報酬変化と計算時間（4パネル）
+    fig1 = plt.figure(figsize=(15, 13))
     
     # --- パネル1: 報酬変化 ---
-    plt.subplot(3, 1, 1)
+    plt.subplot(4, 1, 1)
     plt.plot(iterations, rewards, 'b-', linewidth=2, label='Mean Reward')
     plt.xlabel('Iteration', fontsize=12)
     plt.ylabel('Mean Episode Reward', fontsize=12)
@@ -131,8 +135,24 @@ def plot_training_stats(data, output_filename="training_stats_plot.png"):
     plt.axhline(y=final_reward, color='g', linestyle='--', alpha=0.5, label=f'Final: {final_reward:.2f}')
     plt.legend()
     
-    # --- パネル2: Sample Time と Learn Time ---
-    plt.subplot(3, 1, 2)
+    # --- パネル2: エピソード長 ---
+    plt.subplot(4, 1, 2)
+    plt.plot(iterations, episode_lens, 'orange', linewidth=2, label='Mean Episode Length')
+    plt.xlabel('Iteration', fontsize=12)
+    plt.ylabel('Mean Episode Length', fontsize=12)
+    plt.title('Episode Length Progress', fontsize=14, fontweight='bold')
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    
+    # 統計情報をテキストで追加
+    max_ep_len = max(episode_lens)
+    final_ep_len = episode_lens[-1]
+    plt.axhline(y=max_ep_len, color='r', linestyle='--', alpha=0.5, label=f'Max: {max_ep_len:.1f}')
+    plt.axhline(y=final_ep_len, color='g', linestyle='--', alpha=0.5, label=f'Final: {final_ep_len:.1f}')
+    plt.legend()
+    
+    # --- パネル3: Sample Time と Learn Time ---
+    plt.subplot(4, 1, 3)
     plt.plot(iterations, sample_times, 'g-', linewidth=2, label='Sample Time', alpha=0.7)
     plt.plot(iterations, learn_times, 'r-', linewidth=2, label='Learn Time', alpha=0.7)
     plt.xlabel('Iteration', fontsize=12)
@@ -141,8 +161,8 @@ def plot_training_stats(data, output_filename="training_stats_plot.png"):
     plt.grid(True, alpha=0.3)
     plt.legend()
     
-    # --- パネル3: 累積経過時間 ---
-    plt.subplot(3, 1, 3)
+    # --- パネル4: 累積経過時間 ---
+    plt.subplot(4, 1, 4)
     plt.plot(iterations, elapsed_times, 'purple', linewidth=2, label='Elapsed Time')
     plt.xlabel('Iteration', fontsize=12)
     plt.ylabel('Elapsed Time [s]', fontsize=12)
@@ -151,11 +171,11 @@ def plot_training_stats(data, output_filename="training_stats_plot.png"):
     plt.legend()
     
     # 経過時間を分単位でも表示
-    ax3 = plt.gca()
-    ax3_sec = ax3.twinx()
-    ax3_sec.set_ylabel('Elapsed Time [min]', fontsize=12)
-    ax3_sec.plot(iterations, np.array(elapsed_times) / 60, 'purple', linewidth=0, alpha=0)
-    ax3_sec.set_ylim(np.array(ax3.get_ylim()) / 60)
+    ax4 = plt.gca()
+    ax4_sec = ax4.twinx()
+    ax4_sec.set_ylabel('Elapsed Time [min]', fontsize=12)
+    ax4_sec.plot(iterations, np.array(elapsed_times) / 60, 'purple', linewidth=0, alpha=0)
+    ax4_sec.set_ylim(np.array(ax4.get_ylim()) / 60)
     
     plt.tight_layout()
     plt.savefig(output_filename)
