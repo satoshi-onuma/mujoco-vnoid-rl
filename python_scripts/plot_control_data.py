@@ -78,21 +78,38 @@ def plot_control_analysis(log):
     plt.legend()
     plt.grid(True)
     
-    # --- パネル5: CoM & Base Trajectory (XY平面) ---
+    # --- パネル5: CoM & Feet & Base Trajectory (XY平面) ---
     plt.subplot(3, 2, 5)
     if has_key('base_pos_x'):
         # ベース位置は y=0 としてプロット（X方向の移動のみ）
         plt.plot(log['base_pos_x'], [0]*len(log['base_pos_x']), 'k-', linewidth=2.5, label='Base X', alpha=0.8)
         plt.plot(log['base_pos_x'][0], 0, 'ko', markersize=10, label='Base Start')
         plt.plot(log['base_pos_x'][-1], 0, 'kx', markersize=10, label='Base End')
-    plt.plot(log['com_pos_x'], log['com_pos_y'], 'b-', label='CoM Actual')
-    plt.plot(log['com_pos_ref_x'], log['com_pos_ref_y'], 'b--', label='CoM Ref')
+    
+    # CoM軌道
+    plt.plot(log['com_pos_x'], log['com_pos_y'], 'b-', label='CoM Actual', linewidth=2)
+    plt.plot(log['com_pos_ref_x'], log['com_pos_ref_y'], 'b--', label='CoM Ref', alpha=0.7)
     plt.plot(log['com_pos_x'][0], log['com_pos_y'][0], 'go', markersize=10, label='CoM Start')
     plt.plot(log['com_pos_x'][-1], log['com_pos_y'][-1], 'rx', markersize=10, label='CoM End')
+    
+    # 右足軌道（足0）
+    if has_key('foot_pos_right_x') and has_key('foot_pos_right_y'):
+        plt.plot(log['foot_pos_right_x'], log['foot_pos_right_y'], 'r-', 
+                 label='Right Foot', linewidth=1.5, alpha=0.8)
+        plt.plot(log['foot_pos_right_x'][0], log['foot_pos_right_y'][0], 'r^', markersize=8)
+        plt.plot(log['foot_pos_right_x'][-1], log['foot_pos_right_y'][-1], 'rv', markersize=8)
+    
+    # 左足軌道（足1）
+    if has_key('foot_pos_left_x') and has_key('foot_pos_left_y'):
+        plt.plot(log['foot_pos_left_x'], log['foot_pos_left_y'], 'm-', 
+                 label='Left Foot', linewidth=1.5, alpha=0.8)
+        plt.plot(log['foot_pos_left_x'][0], log['foot_pos_left_y'][0], 'm^', markersize=8)
+        plt.plot(log['foot_pos_left_x'][-1], log['foot_pos_left_y'][-1], 'mv', markersize=8)
+    
     plt.xlabel('X [m]')
     plt.ylabel('Y [m]')
-    plt.title('CoM & Base Trajectory (Top View)')
-    plt.legend(fontsize=8)
+    plt.title('CoM & Feet Trajectory (Top View)')
+    plt.legend(fontsize=7, loc='best')
     plt.grid(True)
     plt.axis('equal')
     
@@ -452,8 +469,83 @@ def plot_control_analysis(log):
     plt.savefig('control_analysis_zmp_local.pdf')
     print(f"✅ グラフ保存完了: control_analysis_zmp_local.pdf")
     
-    # 図6: DCM Offset の計算要素（6パネル）
+    # 図6: 足位置の時系列（3パネル、CoMと重ねて表示）
     fig6 = plt.figure(figsize=(15, 10))
+    
+    # --- パネル1: X座標の時系列 ---
+    plt.subplot(3, 1, 1)
+    # CoM
+    if has_key('com_pos_x'):
+        plt.plot(log['time'], log['com_pos_x'], 'b-', label='CoM X', linewidth=2.5)
+    if has_key('com_pos_ref_x'):
+        plt.plot(log['time'], log['com_pos_ref_x'], 'b--', label='CoM Ref X', linewidth=2, alpha=0.5)
+    # 足位置
+    if has_key('foot_pos_right_x'):
+        plt.plot(log['time'], log['foot_pos_right_x'], 'r-', label='Right Foot X', linewidth=2)
+    if has_key('foot_pos_left_x'):
+        plt.plot(log['time'], log['foot_pos_left_x'], 'm-', label='Left Foot X', linewidth=2)
+    # ベース位置
+    if has_key('base_pos_x'):
+        plt.plot(log['time'], log['base_pos_x'], 'k-', label='Base X', linewidth=2.5, alpha=0.7)
+    plt.xlabel('Time [s]')
+    plt.ylabel('Position X [m]')
+    plt.title('X Position: CoM, Feet, and Base')
+    plt.legend(fontsize=10)
+    plt.grid(True)
+    
+    # --- パネル2: Y座標の時系列 ---
+    plt.subplot(3, 1, 2)
+    # CoM
+    if has_key('com_pos_y'):
+        plt.plot(log['time'], log['com_pos_y'], 'b-', label='CoM Y', linewidth=2.5)
+    if has_key('com_pos_ref_y'):
+        plt.plot(log['time'], log['com_pos_ref_y'], 'b--', label='CoM Ref Y', linewidth=2, alpha=0.5)
+    # 足位置
+    if has_key('foot_pos_right_y'):
+        plt.plot(log['time'], log['foot_pos_right_y'], 'r-', label='Right Foot Y', linewidth=2)
+    if has_key('foot_pos_left_y'):
+        plt.plot(log['time'], log['foot_pos_left_y'], 'm-', label='Left Foot Y', linewidth=2)
+    plt.xlabel('Time [s]')
+    plt.ylabel('Position Y [m]')
+    plt.title('Y Position: CoM and Feet')
+    plt.legend(fontsize=10)
+    plt.grid(True)
+    
+    # --- パネル3: Z座標の時系列（接触状態も表示） ---
+    plt.subplot(3, 1, 3)
+    # CoM
+    if has_key('com_pos_z'):
+        plt.plot(log['time'], log['com_pos_z'], 'b-', label='CoM Z', linewidth=2.5)
+    if has_key('com_pos_ref_z'):
+        plt.plot(log['time'], log['com_pos_ref_z'], 'b--', label='CoM Ref Z', linewidth=2, alpha=0.5)
+    # 足位置
+    if has_key('foot_pos_right_z'):
+        plt.plot(log['time'], log['foot_pos_right_z'], 'r-', label='Right Foot Z', linewidth=2)
+    if has_key('foot_pos_left_z'):
+        plt.plot(log['time'], log['foot_pos_left_z'], 'm-', label='Left Foot Z', linewidth=2)
+    
+    # # 接触状態を背景にハイライト表示
+    # if has_key('obs_contact_right') and has_key('obs_contact_left'):
+    #     contact_right = np.array(log['obs_contact_right']) > 0.5
+    #     contact_left = np.array(log['obs_contact_left']) > 0.5
+    #     for i in range(len(log['time'])-1):
+    #         if contact_right[i]:
+    #             plt.axvspan(log['time'][i], log['time'][i+1], alpha=0.1, color='red')
+    #         if contact_left[i]:
+    #             plt.axvspan(log['time'][i], log['time'][i+1], alpha=0.1, color='magenta')
+    
+    plt.xlabel('Time [s]')
+    plt.ylabel('Position Z [m]')
+    plt.title('Z Position: CoM and Feet (Red/Magenta background = Contact)')
+    plt.legend(fontsize=10)
+    plt.grid(True)
+    
+    plt.tight_layout()
+    plt.savefig('control_analysis_foot_position.pdf')
+    print(f"✅ グラフ保存完了: control_analysis_foot_position.pdf")
+    
+    # 図7: DCM Offset の計算要素（6パネル）
+    fig7 = plt.figure(figsize=(15, 10))
     
     # --- パネル1: DCM Actual と Support Foot (X) ---
     plt.subplot(3, 2, 1)
@@ -543,7 +635,7 @@ def plot_control_analysis(log):
     plt.savefig('control_analysis_dcm_offset_components.pdf')
     print(f"✅ グラフ保存完了: control_analysis_dcm_offset_components.pdf")
     
-    plt.show()
+    #plt.show()
 
 def load_csv_log(csv_filename="control_log.csv"):
     """CSVファイルからログデータを読み込む"""
@@ -680,7 +772,7 @@ def plot_dcm_offset_analysis(log):
     plt.savefig(output_filename_pdf, bbox_inches='tight')
     print(f"💾 グラフ保存: {output_filename_pdf}")
     
-    plt.show()
+    #plt.show()
 
 
 if __name__ == "__main__":

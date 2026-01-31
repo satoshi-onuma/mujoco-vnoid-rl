@@ -177,6 +177,8 @@ void Stabilizer::CalcDcmDynamics(const Timer& timer, const Param& param, const B
 	}
 	// desired moment (in global coordinate);
 	Vector3 Ld = base.ori_ref * Ld_local;
+	//ここでグローバル座標系に変換base.ori_refはあってる前提
+	//deltaが必要な方向をその都度グローバル座標系で渡してるから実際向かってる方向が違うくてもbase.ori_refがあってたら問題ない
 
 	// virtual disturbance applied to DCM dynamics to generate desired recovery moment
 	Vector3 delta = Vector3(-T_mh*Ld.y(), T_mh*Ld.x(), 0.0);

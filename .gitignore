@@ -14,3 +14,4 @@ dist/
 RL_2/
 Baseline_2/
 even_tyrrain_2/
+**/control_log.csv

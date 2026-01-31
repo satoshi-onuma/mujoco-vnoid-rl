@@ -15,8 +15,9 @@ print("🚀 Vnoid Humanoid 学習スクリプト")
 print("=" * 70)
 
 # 設定パラメータ
-NUM_WORKERS = 16   # 並列環境数
+NUM_WORKERS = 18   # 並列環境数
 NUM_GPUS = 1
+ROLLOUT_FRAGMENT_LENGTH = 50
 
 print("設定:")
 print(f"  - 並列環境数: {NUM_WORKERS}")
@@ -42,18 +43,19 @@ config = (
                  )
     .env_runners(
         num_env_runners=NUM_WORKERS,
-        rollout_fragment_length=50,  # ★ 適度な長さ
-        sample_timeout_s=700.0,      # ★ 余裕を持たせる
+        rollout_fragment_length=ROLLOUT_FRAGMENT_LENGTH,  # ★ 適度な長さ
+        sample_timeout_s=2000.0,      # ★ 余裕を持たせる
+        num_cpus_per_env_runner = 1.2, # ★ 環境ごとに1.5CPUを割り当て
     )
     .framework("torch")
     .training(
-        train_batch_size=200, #16*50
+        train_batch_size=NUM_WORKERS*ROLLOUT_FRAGMENT_LENGTH, #16*50
         lr=1e-4,
         gamma=0.99,
         lambda_=0.95,
         clip_param=0.2,
         entropy_coeff=0.0,
-        num_epochs=12,  # ★ num_sgd_iterから変更
+        num_epochs=20,  # ★ num_sgd_iterから変更
     )
     .resources(
         num_gpus=NUM_GPUS,  # ★ TITAN V を活用
@@ -62,7 +64,7 @@ config = (
 )
 
 # sgd_minibatch_sizeは別途設定
-config.sgd_minibatch_size = 64 #16*50/4
+config.sgd_minibatch_size = 256 #16*50/4 =NUM_WORKERS*ROLLOUT_FRAGMENT_LENGTH/4
 
 print("\n📚 アルゴリズム構築中...")
 algo = config.build()
@@ -83,7 +85,7 @@ print("🎓 学習開始...")
 print("-" * 70)
 
 
-for i in range(50):
+for i in range(70):
     result = algo.train()
     
     # 報酬取得

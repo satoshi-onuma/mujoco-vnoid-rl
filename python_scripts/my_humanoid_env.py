@@ -102,14 +102,13 @@ class HumanoidVnoidEnv(gym.Env):
         
         # ★ 1歩完了まで実行（C++側で制御サイクルは1000Hz）
         # C++のstep()は内部でframe_skip回のmj_step()を実行
-         obs, reward, terminated,truncated, info,frames = self.cpp_env.step(rl_action)
+         obs, reward, terminated, info,frames = self.cpp_env.step(rl_action)
          self._step_count += 1
 
          #C++側で出ているrewardの値とPython側で受け取っているrewardの値が違う。
          #並列環境無しで行うと報酬が同じ。８環境で行うと報酬異なる
          #なぜこうなるのか、並列環境一個だけで試す必要あり
-         if not terminated: #terminatedがTrueの場合は最大ステップ数を超えている場合もTrueになるので、Falseの場合のみ最大ステップ数を超えているかをチェック
-            terminated = self._step_count >= self.max_episode_steps
+         truncated = (self._step_count >= self.max_episode_steps) and (not terminated)
 
          # ★ enable_renderingで分岐
          if self.enable_rendering:

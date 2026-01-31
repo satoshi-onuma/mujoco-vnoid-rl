@@ -143,7 +143,9 @@ public:
                          << "zmp_local_x,zmp_local_y,zmp_local_z,"
                          << "obs_ori_w,obs_ori_x,obs_ori_y,obs_ori_z,"
                          << "obs_acc_x,obs_acc_y,obs_acc_z,"
-                         << "obs_foot_height_right,obs_foot_height_left"
+                         << "obs_foot_height_right,obs_foot_height_left,"
+                         << "foot_pos_right_x,foot_pos_right_y,foot_pos_right_z,"
+                         << "foot_pos_left_x,foot_pos_left_y,foot_pos_left_z"
                          << std::endl;
                 
                 csv_file.flush();  // 即座に書き込む
@@ -433,6 +435,7 @@ private:
             -(robot->stabilizer.orientation_ctrl_gain_p*theta.y() + robot->stabilizer.orientation_ctrl_gain_d*omega.y()),
             0.0
         );
+        // desired moment (in local coordinate)
         Vector3 Ld_local(
             robot->param.nominal_inertia.x()*omegadd_local.x(),
             robot->param.nominal_inertia.y()*omegadd_local.y(),
@@ -445,18 +448,19 @@ private:
         
         // 重心周りの角運動量を計算（MuJoCoから取得）
         Vector3 angular_momentum_com = calc_angular_momentum_around_com();
+        Vector3 angular_momentum_com_local = robot->base.ori.conjugate() * angular_momentum_com;
         
-        // 角運動量の時間微分を計算（モーメント）
-        Vector3 angular_moment = Vector3(0.0, 0.0, 0.0);
+        // 角運動量の時間微分を計算（モーメント、ローカル座標系）
+        Vector3 angular_moment_local = Vector3(0.0, 0.0, 0.0);
         double dt = robot->timer.dt;
         if (!first_log && dt > 1e-6) {
-            angular_moment = (angular_momentum_com - prev_angular_momentum_com) / dt;
+            angular_moment_local = (angular_momentum_com_local - prev_angular_momentum_com) / dt;
         }
-        prev_angular_momentum_com = angular_momentum_com;
+        prev_angular_momentum_com = angular_momentum_com_local;
         if (first_log) first_log = false;
         
         // 回復モーメントとの差を計算（ローカル座標系）
-        Vector3 moment_diff = angular_moment - Ld_local;
+        Vector3 moment_diff = angular_moment_local - Ld_local;
         
         // zmp_localを計算（単脚支持時のみ）
         Vector3 zmp_local = Vector3(0.0, 0.0, 0.0);
@@ -492,12 +496,14 @@ private:
                  << robot->base.angle.x() << "," << robot->base.angle.y() << "," << robot->base.angle.z() << ","
                  << robot->base.angle_ref.x() << "," << robot->base.angle_ref.y() << "," << robot->base.angle_ref.z() << ","
                  << Ld_local.x() << "," << Ld_local.y() << "," << Ld_local.z() << ","
-                 << angular_moment.x() << "," << angular_moment.y() << "," << angular_moment.z() << ","
+                 << angular_moment_local.x() << "," << angular_moment_local.y() << "," << angular_moment_local.z() << ","
                  << moment_diff.x() << "," << moment_diff.y() << "," << moment_diff.z() << ","
                  << zmp_local.x() << "," << zmp_local.y() << "," << zmp_local.z() << ","
                  << robot->base.ori.w() << "," << robot->base.ori.x() << "," << robot->base.ori.y() << "," << robot->base.ori.z() << ","
                  << robot->base.acc[0] << "," << robot->base.acc[1] << "," << robot->base.acc[2] << ","
-                 << robot->foot[0].pos_ref[2] << "," << robot->foot[1].pos_ref[2]
+                 << robot->foot[0].pos_ref[2] << "," << robot->foot[1].pos_ref[2] << ","
+                 << robot->foot[0].pos[0] << "," << robot->foot[0].pos[1] << "," << robot->foot[0].pos[2] << ","
+                 << robot->foot[1].pos[0] << "," << robot->foot[1].pos[1] << "," << robot->foot[1].pos[2]
                  << std::endl;
         
         // 定期的にflush（例：100回に1回）
@@ -672,7 +678,7 @@ public:
         const int MAX_ITERATIONS = 1000;
         const double MIN_HEIGHT = 0.5;
         bool terminated = false;
-        bool truncated = false;
+        bool timeout = false;
 
         std::vector<py::array_t<unsigned char>> frame_list;
 
@@ -716,7 +722,8 @@ public:
             step_counter++;
 
             if (step_counter  >= MAX_ITERATIONS) {
-                truncated = true;  // タイムアウトフラグをセット
+                terminated = true;
+                timeout = true;  // タイムアウトフラグをセット
                 std::cerr << "[WARNING] Step timeout" << std::endl;
                 break;
             }
@@ -731,11 +738,14 @@ public:
         double reward = compute_reward();
 
         // 転倒時にペナルティを設定
-        if (terminated) {
+        //truncatedはまだまだ行けるけど終了する場合なので報酬はブートストラップする
+        //terminatedは終了する場合なので報酬はブートストラップしない
+        //terminated使いたいけどtimeout使わないと負の報酬はできない
+        if (timeout) {
             reward -= 10.0;
         }
         
-        return py::make_tuple(obs, reward, terminated, truncated, py::dict(),frame_list);
+        return py::make_tuple(obs, reward, terminated, py::dict(),frame_list);
     }
 
     
