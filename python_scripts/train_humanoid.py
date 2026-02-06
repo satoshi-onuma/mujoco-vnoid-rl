@@ -15,7 +15,7 @@ print("🚀 Vnoid Humanoid 学習スクリプト")
 print("=" * 70)
 
 # 設定パラメータ
-NUM_WORKERS = 18   # 並列環境数
+NUM_WORKERS = 8   # 並列環境数
 NUM_GPUS = 1
 ROLLOUT_FRAGMENT_LENGTH = 50
 
@@ -29,7 +29,7 @@ print("=" * 70)
 # Ray初期化
 if not ray.is_initialized():
     ray.init(
-        #address='auto',  # 既存クラスタを検出
+        address='auto',  # 既存クラスタを検出
         logging_level="ERROR",
         #ignore_reinit_error=True
     )
@@ -44,8 +44,8 @@ config = (
     .env_runners(
         num_env_runners=NUM_WORKERS,
         rollout_fragment_length=ROLLOUT_FRAGMENT_LENGTH,  # ★ 適度な長さ
-        sample_timeout_s=2000.0,      # ★ 余裕を持たせる
-        num_cpus_per_env_runner = 1.2, # ★ 環境ごとに1.5CPUを割り当て
+        sample_timeout_s=1000.0,      # ★ 余裕を持たせる
+        #num_cpus_per_env_runner = 1.2, # ★ 環境ごとに1.5CPUを割り当て
     )
     .framework("torch")
     .training(
@@ -55,7 +55,7 @@ config = (
         lambda_=0.95,
         clip_param=0.2,
         entropy_coeff=0.0,
-        num_epochs=20,  # ★ num_sgd_iterから変更
+        num_sgd_iter=20,  # ★ num_sgd_iterから変更
     )
     .resources(
         num_gpus=NUM_GPUS,  # ★ TITAN V を活用
@@ -85,7 +85,7 @@ print("🎓 学習開始...")
 print("-" * 70)
 
 
-for i in range(70):
+for i in range(100):
     result = algo.train()
     
     # 報酬取得

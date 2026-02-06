@@ -43,8 +43,9 @@ def load_csv_log(csv_filename="control_log.csv"):
 
 def plot_com_position_thesis(log, output_dir=".", time_range=None):
     """
-    卒論用：CoM位置のプロット（X, Y, Top Viewの3枚）
+    卒論用：CoM位置のプロット（X, Y, Z, Top Viewの4枚）
     実測値と所望値を比較
+    Z方向のみ足位置も追加
     
     Parameters:
     -----------
@@ -74,6 +75,9 @@ def plot_com_position_thesis(log, output_dir=".", time_range=None):
         com_pos_ref_x = np.array(log['com_pos_ref_x'])[mask]
         com_pos_ref_y = np.array(log['com_pos_ref_y'])[mask]
         com_pos_ref_z = np.array(log['com_pos_ref_z'])[mask]
+        # 足位置データの読み込み（Z方向用）
+        foot_pos_left_z = np.array(log['foot_pos_left_z'])[mask]
+        foot_pos_right_z = np.array(log['foot_pos_right_z'])[mask]
     else:
         t_min, t_max = time[0], time[-1]
         com_pos_x = np.array(log['com_pos_x'])
@@ -82,21 +86,25 @@ def plot_com_position_thesis(log, output_dir=".", time_range=None):
         com_pos_ref_x = np.array(log['com_pos_ref_x'])
         com_pos_ref_y = np.array(log['com_pos_ref_y'])
         com_pos_ref_z = np.array(log['com_pos_ref_z'])
+        # 足位置データの読み込み（Z方向用）
+        foot_pos_left_z = np.array(log['foot_pos_left_z'])
+        foot_pos_right_z = np.array(log['foot_pos_right_z'])
     
     print(f"   時間範囲: {t_min:.2f} - {t_max:.2f} 秒")
     
     # 出力ディレクトリの作成
     os.makedirs(output_dir, exist_ok=True)
     
-    # --- グラフ1: CoM Position X（実測値 vs 所望値） ---
-    fig1, ax1 = plt.subplots(figsize=(8, 5))
-    ax1.plot(time, com_pos_x, 'b-', linewidth=1.5, label='Actual')
-    ax1.plot(time, com_pos_ref_x, 'k--', linewidth=1.5, label='Desired')
+    # --- グラフ1: CoM Position X（実測値 vs 所望値のみ） ---
+    fig1, ax1 = plt.subplots(figsize=(10, 4))
+    ax1.plot(time, com_pos_x, 'b-', linewidth=2.0, label='Actual')
+    ax1.plot(time, com_pos_ref_x, 'k--', linewidth=2.0, label='Desired')
     ax1.set_xlabel('Time [s]')
     ax1.set_ylabel('CoM Position X [m]')
-    ax1.set_xlim(t_min, t_max)
-    ax1.legend(loc='best')
-    ax1.grid(True, alpha=0.3, linestyle='--')
+    ax1.set_xlim(-1, 21)
+    ax1.set_ylim(-0.5, 5.0)
+    ax1.legend(loc='upper left', frameon=False)
+    ax1.tick_params(direction='in')
     plt.tight_layout()
     
     output_file1 = os.path.join(output_dir, "thesis_com_position_x.pdf")
@@ -104,15 +112,16 @@ def plot_com_position_thesis(log, output_dir=".", time_range=None):
     print(f"   ✅ 保存: {output_file1}")
     plt.close(fig1)
     
-    # --- グラフ2: CoM Position Y（実測値 vs 所望値） ---
-    fig2, ax2 = plt.subplots(figsize=(8, 5))
-    ax2.plot(time, com_pos_y, 'b-', linewidth=1.5, label='Actual')
-    ax2.plot(time, com_pos_ref_y, 'k--', linewidth=1.5, label='Desired')
+    # --- グラフ2: CoM Position Y（実測値 vs 所望値のみ） ---
+    fig2, ax2 = plt.subplots(figsize=(10, 4))
+    ax2.plot(time, com_pos_y, 'b-', linewidth=2.0, label='Actual')
+    ax2.plot(time, com_pos_ref_y, 'k--', linewidth=2.0, label='Desired')
     ax2.set_xlabel('Time [s]')
     ax2.set_ylabel('CoM Position Y [m]')
-    ax2.set_xlim(t_min, t_max)
-    ax2.legend(loc='best')
-    ax2.grid(True, alpha=0.3, linestyle='--')
+    ax2.set_xlim(-1, 21)
+    ax2.set_ylim(-1.7, 1.0)
+    ax2.legend(loc='upper left', frameon=False)
+    ax2.tick_params(direction='in')
     plt.tight_layout()
     
     output_file2 = os.path.join(output_dir, "thesis_com_position_y.pdf")
@@ -120,24 +129,45 @@ def plot_com_position_thesis(log, output_dir=".", time_range=None):
     print(f"   ✅ 保存: {output_file2}")
     plt.close(fig2)
     
-    # --- グラフ3: CoM Trajectory (Top View)（実測値 vs 所望値） ---
-    fig3, ax3 = plt.subplots(figsize=(8, 5))
-    # 実測値の軌跡
-    ax3.plot(com_pos_x, com_pos_y, 'b-', linewidth=1.5, label='Actual')
-    # 所望値の軌跡
-    ax3.plot(com_pos_ref_x, com_pos_ref_y, 'k--', linewidth=1.5, label='Desired')
-    
-    ax3.set_xlabel('CoM Position X [m]')
-    ax3.set_ylabel('CoM Position Y [m]')
-    ax3.grid(True, alpha=0.3, linestyle='--')
-    ax3.legend(loc='best')
-    ax3.axis('equal')
+    # --- グラフ3: CoM Position Z（実測値 vs 所望値 + 足位置） ---
+    fig3, ax3 = plt.subplots(figsize=(10, 4))
+    ax3.plot(time, com_pos_z, 'b-', linewidth=2.0, label='CoM Actual')
+    ax3.plot(time, com_pos_ref_z, 'k--', linewidth=2.0, label='CoM Desired')
+    # 両足を同じスタイルで表示（太さで区別）
+    ax3.plot(time, foot_pos_left_z, 'r-.', linewidth=1.0, label='Foot', alpha=0.8)
+    ax3.plot(time, foot_pos_right_z, 'r-.', linewidth=1.0, alpha=0.8)  # ラベルなし
+    # 地面を表す線
+    ax3.axhline(y=0, color='gray', linestyle='-', linewidth=1.0, alpha=0.5, label='Ground')
+    ax3.set_xlabel('Time [s]')
+    ax3.set_ylabel('CoM Position Z [m]')
+    ax3.set_xlim(-1, 21)
+    ax3.set_ylim(-0.1, 1.1)
+    ax3.legend(loc='upper right', frameon=False)
+    ax3.tick_params(direction='in')
     plt.tight_layout()
     
-    output_file3 = os.path.join(output_dir, "thesis_com_trajectory_topview.pdf")
+    output_file3 = os.path.join(output_dir, "thesis_com_position_z.pdf")
     plt.savefig(output_file3)
     print(f"   ✅ 保存: {output_file3}")
     plt.close(fig3)
+    
+    # --- グラフ4: CoM Trajectory (Top View)（実測値 vs 所望値のみ） ---
+    fig4, ax4 = plt.subplots(figsize=(10, 4))
+    ax4.plot(com_pos_x, com_pos_y, 'b-', linewidth=2.0, label='Actual')
+    ax4.plot(com_pos_ref_x, com_pos_ref_y, 'k--', linewidth=2.0, label='Desired')
+    
+    ax4.set_xlabel('CoM Position X [m]')
+    ax4.set_ylabel('CoM Position Y [m]')
+    ax4.set_xlim(-0.5, 5.0)
+    ax4.set_ylim(-1.7, 1.0)
+    ax4.legend(loc='upper left', frameon=False)
+    ax4.tick_params(direction='in')
+    plt.tight_layout()
+    
+    output_file4 = os.path.join(output_dir, "thesis_com_trajectory_topview.pdf")
+    plt.savefig(output_file4)
+    print(f"   ✅ 保存: {output_file4}")
+    plt.close(fig4)
     
     print(f"\n✅ CoM位置グラフ生成完了")
 
@@ -178,12 +208,13 @@ def plot_rl_action_thesis(log, output_dir=".", time_range=None):
     os.makedirs(output_dir, exist_ok=True)
     
     # --- グラフ1: RL Action X ---
-    fig1, ax1 = plt.subplots(figsize=(8, 5))
+    fig1, ax1 = plt.subplots(figsize=(10, 4))
     ax1.plot(time, rl_action_x, 'b-', linewidth=1.5)
     ax1.set_xlabel('Time [s]')
     ax1.set_ylabel('RL Action Foot Offset X [m]')
-    ax1.set_xlim(t_min, t_max)
-    ax1.grid(True, alpha=0.3, linestyle='--')
+    ax1.set_xlim(-1, 21)
+    ax1.set_ylim(-0.16, 0.01)
+    ax1.tick_params(direction='in')
     plt.tight_layout()
     
     output_file1 = os.path.join(output_dir, "thesis_rl_action_x.pdf")
@@ -192,12 +223,13 @@ def plot_rl_action_thesis(log, output_dir=".", time_range=None):
     plt.close(fig1)
     
     # --- グラフ2: RL Action Y ---
-    fig2, ax2 = plt.subplots(figsize=(8, 5))
+    fig2, ax2 = plt.subplots(figsize=(10, 4))
     ax2.plot(time, rl_action_y, 'b-', linewidth=1.5)
     ax2.set_xlabel('Time [s]')
     ax2.set_ylabel('RL Action Foot Offset Y [m]')
-    ax2.set_xlim(t_min, t_max)
-    ax2.grid(True, alpha=0.3, linestyle='--')
+    ax2.set_xlim(-1, 21)
+    ax2.set_ylim(-0.11, 0.11)
+    ax2.tick_params(direction='in')
     plt.tight_layout()
     
     output_file2 = os.path.join(output_dir, "thesis_rl_action_y.pdf")
@@ -249,14 +281,15 @@ def plot_dcm_offset_thesis(log, output_dir=".", time_range=None):
     os.makedirs(output_dir, exist_ok=True)
     
     # --- グラフ1: DCM Offset X（実測値 vs 所望値） ---
-    fig1, ax1 = plt.subplots(figsize=(8, 5))
+    fig1, ax1 = plt.subplots(figsize=(10, 4))
     ax1.plot(time, dcm_offset_actual_x, 'b-', linewidth=1.5, label='Actual')
     ax1.plot(time, dcm_offset_desired_x, 'k--', linewidth=1.5, label='Desired')
     ax1.set_xlabel('Time [s]')
     ax1.set_ylabel('DCM Offset X [m]')
-    ax1.set_xlim(t_min, t_max)
-    ax1.legend(loc='best')
-    ax1.grid(True, alpha=0.3, linestyle='--')
+    ax1.set_xlim(-1, 21)
+    ax1.set_ylim(-0.6, 0.6)
+    ax1.legend(loc='upper left', frameon=False)
+    ax1.tick_params(direction='in')
     plt.tight_layout()
     
     output_file1 = os.path.join(output_dir, "thesis_dcm_offset_x.pdf")
@@ -265,14 +298,15 @@ def plot_dcm_offset_thesis(log, output_dir=".", time_range=None):
     plt.close(fig1)
     
     # --- グラフ2: DCM Offset Y（実測値 vs 所望値） ---
-    fig2, ax2 = plt.subplots(figsize=(8, 5))
+    fig2, ax2 = plt.subplots(figsize=(10, 4))
     ax2.plot(time, dcm_offset_actual_y, 'b-', linewidth=1.5, label='Actual')
     ax2.plot(time, dcm_offset_desired_y, 'k--', linewidth=1.5, label='Desired')
     ax2.set_xlabel('Time [s]')
     ax2.set_ylabel('DCM Offset Y [m]')
-    ax2.set_xlim(t_min, t_max)
-    ax2.legend(loc='best')
-    ax2.grid(True, alpha=0.3, linestyle='--')
+    ax2.set_xlim(-1, 21)
+    ax2.set_ylim(-0.6, 0.6)
+    ax2.legend(loc='upper left', frameon=False)
+    ax2.tick_params(direction='in')
     plt.tight_layout()
     
     output_file2 = os.path.join(output_dir, "thesis_dcm_offset_y.pdf")
@@ -329,14 +363,15 @@ def plot_moment_thesis(log, output_dir=".", time_range=None):
     os.makedirs(output_dir, exist_ok=True)
     
     # --- グラフ1: Recovery Moment X（実測値 vs 所望値） ---
-    fig1, ax1 = plt.subplots(figsize=(8, 5))
+    fig1, ax1 = plt.subplots(figsize=(10, 4))
     ax1.plot(time, angular_moment_x, 'b-', linewidth=1.5, label='Actual')
     ax1.plot(time, recovery_moment_x, 'k--', linewidth=1.5, label='Desired')
     ax1.set_xlabel('Time [s]')
     ax1.set_ylabel('Recovery Moment X [Nm]')
-    ax1.set_xlim(t_min, t_max)
-    ax1.legend(loc='best')
-    ax1.grid(True, alpha=0.3, linestyle='--')
+    ax1.set_xlim(-1, 21)
+    ax1.set_ylim(-350, 350)
+    ax1.legend(loc='upper left', frameon=False)
+    ax1.tick_params(direction='in')
     plt.tight_layout()
     
     output_file1 = os.path.join(output_dir, "thesis_recovery_moment_x.pdf")
@@ -345,14 +380,15 @@ def plot_moment_thesis(log, output_dir=".", time_range=None):
     plt.close(fig1)
     
     # --- グラフ2: Recovery Moment Y（実測値 vs 所望値） ---
-    fig2, ax2 = plt.subplots(figsize=(8, 5))
+    fig2, ax2 = plt.subplots(figsize=(10, 4))
     ax2.plot(time, angular_moment_y, 'b-', linewidth=1.5, label='Actual')
     ax2.plot(time, recovery_moment_y, 'k--', linewidth=1.5, label='Desired')
     ax2.set_xlabel('Time [s]')
     ax2.set_ylabel('Recovery Moment Y [Nm]')
-    ax2.set_xlim(t_min, t_max)
-    ax2.legend(loc='best')
-    ax2.grid(True, alpha=0.3, linestyle='--')
+    ax2.set_xlim(-1, 21)
+    ax2.set_ylim(-350, 350)
+    ax2.legend(loc='upper left', frameon=False)
+    ax2.tick_params(direction='in')
     plt.tight_layout()
     
     output_file2 = os.path.join(output_dir, "thesis_recovery_moment_y.pdf")
@@ -361,12 +397,13 @@ def plot_moment_thesis(log, output_dir=".", time_range=None):
     plt.close(fig2)
     
     # --- グラフ3: Moment Difference X（差分） ---
-    fig3, ax3 = plt.subplots(figsize=(8, 5))
+    fig3, ax3 = plt.subplots(figsize=(10, 4))
     ax3.plot(time, moment_diff_x, 'b-', linewidth=1.5)
     ax3.set_xlabel('Time [s]')
     ax3.set_ylabel('Moment Difference X [Nm]')
-    ax3.set_xlim(t_min, t_max)
-    ax3.grid(True, alpha=0.3, linestyle='--')
+    ax3.set_xlim(-1, 21)
+    ax3.set_ylim(-350, 350)
+    ax3.tick_params(direction='in')
     plt.tight_layout()
     
     output_file3 = os.path.join(output_dir, "thesis_moment_diff_x.pdf")
@@ -375,12 +412,13 @@ def plot_moment_thesis(log, output_dir=".", time_range=None):
     plt.close(fig3)
     
     # --- グラフ4: Moment Difference Y（差分） ---
-    fig4, ax4 = plt.subplots(figsize=(8, 5))
+    fig4, ax4 = plt.subplots(figsize=(10, 4))
     ax4.plot(time, moment_diff_y, 'b-', linewidth=1.5)
     ax4.set_xlabel('Time [s]')
     ax4.set_ylabel('Moment Difference Y [Nm]')
-    ax4.set_xlim(t_min, t_max)
-    ax4.grid(True, alpha=0.3, linestyle='--')
+    ax4.set_xlim(-1, 21)
+    ax4.set_ylim(-350, 350)
+    ax4.tick_params(direction='in')
     plt.tight_layout()
     
     output_file4 = os.path.join(output_dir, "thesis_moment_diff_y.pdf")
@@ -427,11 +465,11 @@ if __name__ == "__main__":
         
         print("\n" + "=" * 70)
         print("✅ 全てのグラフ生成完了")
-        print("   - CoM位置: 3枚")
+        print("   - CoM位置: 4枚 (X, Y, Z, Top View)")
         print("   - RL Action: 2枚")
         print("   - DCM Offset: 2枚")
         print("   - 回復モーメント: 4枚")
-        print("   合計: 11枚のPDFグラフ")
+        print("   合計: 12枚のPDFグラフ")
     else:
         print("⚠️ ログデータが空です")
     

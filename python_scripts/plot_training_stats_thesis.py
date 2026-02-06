@@ -13,17 +13,12 @@ import numpy as np
 # 論文用の設定
 matplotlib.use('Agg')
 plt.rcParams['font.family'] = 'sans-serif'
-plt.rcParams['font.size'] = 11
-plt.rcParams['axes.linewidth'] = 1.0
-plt.rcParams['grid.linewidth'] = 0.5
+plt.rcParams['font.size'] = 12
+plt.rcParams['axes.labelsize'] = 14
+plt.rcParams['axes.titlesize'] = 14
+plt.rcParams['legend.fontsize'] = 11
+plt.rcParams['figure.dpi'] = 150
 plt.rcParams['lines.linewidth'] = 1.5
-plt.rcParams['lines.markersize'] = 4
-
-# 白黒印刷対応のための設定
-plt.rcParams['axes.prop_cycle'] = matplotlib.cycler(
-    color=['k', '0.4', '0.6', '0.8'],
-    linestyle=['-', '--', '-.', ':']
-)
 
 def load_training_stats(csv_filename):
     """CSVファイルから学習統計データを読み込む"""
@@ -53,7 +48,7 @@ def load_training_stats(csv_filename):
 
 def plot_thesis_style(data, output_filename="training_curve.pdf", 
                       title=None, xlabel="Iteration", ylabel="Mean Episode Reward",
-                      figsize=(8, 5)):
+                      figsize=(10, 4)):
     """
     論文用のシンプルな学習曲線をプロット
     
@@ -85,19 +80,16 @@ def plot_thesis_style(data, output_filename="training_curve.pdf",
     fig, ax = plt.subplots(figsize=figsize)
     
     # 生データをプロット
-    ax.plot(iterations, rewards, 'k-', linewidth=1.5, label='Training reward', alpha=0.8)
+    ax.plot(iterations, rewards, 'b-', linewidth=1.5, label='Training reward')
     
     # 軸ラベルとタイトル
-    ax.set_xlabel(xlabel, fontsize=12)
-    ax.set_ylabel(ylabel, fontsize=12)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel(ylabel)
     if title:
-        ax.set_title(title, fontsize=13, fontweight='bold')
+        ax.set_title(title)
     
-    # グリッド（控えめに）
-    ax.grid(True, alpha=0.3, linestyle='--', linewidth=0.5)
-    
-    # 凡例（右下または最適な位置）
-    ax.legend(loc='best', framealpha=0.9, fontsize=10)
+    # 軸目盛りを内向きに
+    ax.tick_params(direction='in')
     
     # レイアウト調整
     plt.tight_layout()
