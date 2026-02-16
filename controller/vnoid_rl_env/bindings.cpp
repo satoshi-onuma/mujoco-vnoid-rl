@@ -118,7 +118,10 @@ public:
                 
                 // ヘッダー行を書き込む
                 csv_file << "time,"
-                         << "base_pos_x,"
+                         << "base_pos_x,base_pos_y,base_pos_z,"
+                         << "base_pos_ref_x,base_pos_ref_y,base_pos_ref_z,"
+                         << "base_ori_w,base_ori_x,base_ori_y,base_ori_z,"
+                         << "base_ori_ref_w,base_ori_ref_x,base_ori_ref_y,base_ori_ref_z,"
                          << "com_pos_x,com_pos_y,com_pos_z,"
                          << "com_pos_ref_x,com_pos_ref_y,com_pos_ref_z,"
                          << "com_vel_x,com_vel_y,com_vel_z,"
@@ -476,7 +479,10 @@ private:
         
         // CSVに1行書き込む
         csv_file << time << ","
-                 << d->qpos[0] << ","
+                 << robot->base.pos.x() << "," << robot->base.pos.y() << "," << robot->base.pos.z() << ","
+                 << robot->base.pos_ref.x() << "," << robot->base.pos_ref.y() << "," << robot->base.pos_ref.z() << ","
+                 << robot->base.ori.w() << "," << robot->base.ori.x() << "," << robot->base.ori.y() << "," << robot->base.ori.z() << ","
+                 << robot->base.ori_ref.w() << "," << robot->base.ori_ref.x() << "," << robot->base.ori_ref.y() << "," << robot->base.ori_ref.z() << ","
                  << robot->centroid.com_pos.x() << "," << robot->centroid.com_pos.y() << "," << robot->centroid.com_pos.z() << ","
                  << robot->centroid.com_pos_ref.x() << "," << robot->centroid.com_pos_ref.y() << "," << robot->centroid.com_pos_ref.z() << ","
                  << com_vel.x() << "," << com_vel.y() << "," << com_vel.z() << ","
