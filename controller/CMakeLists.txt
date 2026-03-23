@@ -1,6 +1,7 @@
 if(VNOID_BUILD_CNOID)
 	add_subdirectory(sample_controller)
 	add_subdirectory(shorttrack_controller)
+	add_subdirectory(vnoid_rl_controller)
 
 	add_subdirectory(demos)
 endif()
