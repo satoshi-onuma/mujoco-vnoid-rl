@@ -265,7 +265,8 @@ void MyRobot::Control(){
 	footstep_planner.Plan(param, footstep);
     footstep_planner.GenerateDCM(param, footstep);
 
-    stepping_controller.Update(timer, param, footstep, footstep_buffer, centroid, base, foot);
+    RLParams dummy_rl_params;
+    stepping_controller.Update(timer, param, footstep, footstep_buffer, centroid, base, foot, dummy_rl_params);
 
     // stabilizer performs balance feedback
     stabilizer.Update(timer, param, centroid, base, foot);

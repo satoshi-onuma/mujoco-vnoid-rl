@@ -1,6 +1,19 @@
 """
-Choreonoid End-to-End RL学習スクリプト
-RLlib PPOを使用
+Choreonoid End-to-End RL 学習スクリプト (Ray RLlib PPO)
+=======================================================
+
+## env_id の対応について
+
+Choreonoid プロセスと Ray ワーカーは共有メモリ名 /vnoid_rl_shm_<env_id> で
+1対1に対応する。この対応を保証するために:
+
+  - num_envs_per_env_runner = 1 に固定する (ベクトル化環境を使わない)
+  - Choreonoid を NUM_WORKERS 個、ENV_ID=0..NUM_WORKERS-1 で起動する
+  - make_choreonoid_env は worker_index * 1 + 0 = worker_index を env_id とする
+
+num_envs_per_env_runner > 1 にすると、Python 側の env_id 計算が
+worker_index * num_envs + vector_index になり、事前に起動する
+Choreonoid の数と整合が取れなくなるため、このスクリプトでは禁止する。
 """
 
 import os
@@ -15,51 +28,65 @@ from ray import tune
 from choreonoid_env import ChoreonoidEnv, make_choreonoid_env
 
 print("=" * 70)
-print("🚀 Choreonoid End-to-End RL 学習スクリプト")
+print("Choreonoid End-to-End RL 学習スクリプト")
 print("=" * 70)
 
+# ---------------------------------------------------------------------------
 # 設定パラメータ
-NUM_WORKERS = 1  # まずは1環境でテスト
-NUM_GPUS = 1
-ROLLOUT_FRAGMENT_LENGTH = 100
-MAX_EPISODE_STEPS = 1000
+# ---------------------------------------------------------------------------
 
-# Choreonoid実行ファイルのパス
-CHOREONOID_BIN = os.path.expanduser("~/choreonoid/build/bin/choreonoid")
+NUM_WORKERS            = 1    # 並列環境数 (Choreonoid プロセス数と一致させる)
+NUM_GPUS               = 1
+ROLLOUT_FRAGMENT_LENGTH = 100
+MAX_EPISODE_STEPS      = 1000
+
+# num_envs_per_env_runner は必ず 1 に固定する。
+# 変更すると Choreonoid の ENV_ID と Python の env_id がずれる。
+NUM_ENVS_PER_WORKER = 1
+
+# Choreonoid 実行ファイルのパス
+CHOREONOID_BIN     = os.path.expanduser("~/choreonoid/build/bin/choreonoid")
 CHOREONOID_PROJECT = os.path.expanduser("~/choreonoid/ext/vnoid/project/vnoid_rl_project.cnoid")
 
 print("設定:")
-print(f"  - 並列環境数: {NUM_WORKERS}")
-print(f"  - 学習アルゴリズム: PPO")
-print(f"  - 最大エピソード長: {MAX_EPISODE_STEPS}")
+print(f"  - 並列環境数 (NUM_WORKERS): {NUM_WORKERS}")
+print(f"  - ワーカーあたり環境数:       {NUM_ENVS_PER_WORKER} (固定)")
+print(f"  - 学習アルゴリズム:           PPO")
+print(f"  - 最大エピソード長:           {MAX_EPISODE_STEPS}")
 print("=" * 70)
 
-# Ray初期化
-if not ray.is_initialized():
-    ray.init(
-        logging_level="ERROR",
-    )
+# ---------------------------------------------------------------------------
+# Ray 初期化・環境登録
+# ---------------------------------------------------------------------------
 
-print("\n📚 環境登録...")
+if not ray.is_initialized():
+    ray.init(logging_level="ERROR")
+
 tune.register_env("ChoreonoidEnv-v0", make_choreonoid_env)
 
-# PPO設定（MuJoCo版と同じハイパーパラメータ）
+# ---------------------------------------------------------------------------
+# PPO 設定
+# ---------------------------------------------------------------------------
+
 config = (
     PPOConfig()
     .environment(
         env="ChoreonoidEnv-v0",
         env_config={
-            "max_episode_steps": MAX_EPISODE_STEPS
+            "max_episode_steps":       MAX_EPISODE_STEPS,
+            "num_envs_per_env_runner": NUM_ENVS_PER_WORKER,  # make_choreonoid_env に渡す
         }
     )
     .env_runners(
         num_env_runners=NUM_WORKERS,
+        num_envs_per_env_runner=NUM_ENVS_PER_WORKER,  # 1 に固定
         rollout_fragment_length=ROLLOUT_FRAGMENT_LENGTH,
         sample_timeout_s=1000.0,
     )
     .framework("torch")
     .training(
         train_batch_size=NUM_WORKERS * ROLLOUT_FRAGMENT_LENGTH,
+        minibatch_size=64,
         lr=1e-4,
         gamma=0.99,
         lambda_=0.95,
@@ -73,127 +100,102 @@ config = (
     .debugging(seed=42)
 )
 
-config.sgd_minibatch_size = 256
+# ---------------------------------------------------------------------------
+# Choreonoid プロセス起動
+# ---------------------------------------------------------------------------
+# ENV_ID=worker_id で起動することで、Ray の worker_index と 1対1 に対応させる。
 
-print("\n🔧 Choreonoidプロセスを起動中...")
+print("\nChoreonoid プロセスを起動中...")
 choreonoid_processes = []
 
 for worker_id in range(NUM_WORKERS):
-    env_id = worker_id
-    env_vars = os.environ.copy()
+    env_id    = worker_id  # worker_index と一致 (num_envs_per_worker=1 前提)
+    env_vars  = os.environ.copy()
     env_vars["ENV_ID"] = str(env_id)
-    
-    # Choreonoidをバックグラウンドで起動
+
     proc = subprocess.Popen(
         [CHOREONOID_BIN, CHOREONOID_PROJECT, "--start-simulation"],
         env=env_vars,
         stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL
+        stderr=subprocess.DEVNULL,
     )
     choreonoid_processes.append(proc)
-    print(f"  Choreonoid起動 (ENV_ID={env_id}, PID={proc.pid})")
+    print(f"  Choreonoid 起動 (ENV_ID={env_id}, PID={proc.pid})")
     time.sleep(2)  # プロセス起動の間隔を空ける
 
-print(f"✅ {NUM_WORKERS}個のChoreonoidプロセスを起動完了")
-print("⏳ 5秒待機してからアルゴリズムを構築...")
+print(f"{NUM_WORKERS} 個の Choreonoid プロセスを起動完了")
+print("5 秒待機してからアルゴリズムを構築...")
 time.sleep(5)
 
+# ---------------------------------------------------------------------------
+# 学習ループ
+# ---------------------------------------------------------------------------
+
 try:
-    print("\n📚 アルゴリズム構築中...")
+    print("\nアルゴリズム構築中...")
     algo = config.build()
-    print("✅ アルゴリズム構築完了\n")
-    
-    # 学習ループ
-    checkpoint_dir = os.path.abspath("./choreonoid_checkpoint")
-    
-    # 学習統計用のCSV
+    print("アルゴリズム構築完了\n")
+
+    checkpoint_dir        = os.path.abspath("./choreonoid_checkpoint")
     training_csv_filename = "training_stats_choreonoid.csv"
-    training_csv = open(training_csv_filename, 'w', newline='')
-    training_writer = csv.writer(training_csv)
-    training_writer.writerow([
-        'iteration', 'reward_mean', 'episode_len_mean',
-        'sample_time_s', 'learn_time_s', 'elapsed_time_s', 'iter_time_s'
-    ])
-    
-    start_time = time.time()
-    
-    print("🎓 学習開始...")
+
+    with open(training_csv_filename, 'w', newline='') as training_csv:
+        training_writer = csv.writer(training_csv)
+        training_writer.writerow([
+            'iteration', 'reward_mean', 'episode_len_mean',
+            'sample_time_s', 'learn_time_s', 'elapsed_time_s', 'iter_time_s',
+        ])
+
+        start_time = time.time()
+        print("学習開始...")
+        print("-" * 70)
+
+        for i in range(100):
+            result = algo.train()
+
+            reward      = result.get("env_runners", {}).get("episode_return_mean", 0.0)
+            episode_len = result.get("env_runners", {}).get("episode_len_mean",    0.0)
+            sample_time = result.get("timers",      {}).get("sample_time_ms",      0.0) / 1000.0
+            learn_time  = result.get("timers",      {}).get("learn_time_ms",       0.0) / 1000.0
+            iter_time   = result.get("time_this_iter_s", 0.0)
+            elapsed     = time.time() - start_time
+
+            print(f"Iter {i:3d} | Reward: {reward:8.2f} | Len: {episode_len:6.1f} | Time: {iter_time:6.1f}s")
+
+            training_writer.writerow([i, reward, episode_len, sample_time, learn_time, elapsed, iter_time])
+            training_csv.flush()
+
+            if (i + 1) % 10 == 0:
+                save_result = algo.save(checkpoint_dir)
+                print(f"  チェックポイント保存: {save_result.checkpoint.path}")
+
     print("-" * 70)
-    
-    for i in range(100):
-        result = algo.train()
-        
-        # 報酬取得
-        try:
-            reward = result["env_runners"]["episode_return_mean"]
-        except KeyError:
-            reward = 0.0
-        
-        # エピソード長取得
-        try:
-            episode_len = result["env_runners"]["episode_len_mean"]
-        except KeyError:
-            episode_len = 0.0
-        
-        # タイマー情報取得
-        try:
-            sample_time = result.get("timers", {}).get("sample_time_ms", 0.0) / 1000.0
-        except (KeyError, AttributeError):
-            sample_time = 0.0
-        
-        try:
-            learn_time = result.get("timers", {}).get("learn_time_ms", 0.0) / 1000.0
-        except (KeyError, AttributeError):
-            learn_time = 0.0
-        
-        try:
-            iter_time = result.get("time_this_iter_s", 0.0)
-        except (KeyError, AttributeError):
-            iter_time = 0.0
-        
-        elapsed = time.time() - start_time
-        
-        # コンソール出力
-        print(f"Iter {i:3d} | Reward: {reward:8.2f} | Len: {episode_len:6.1f} | Time: {iter_time:6.1f}s")
-        
-        # CSV書き込み
-        training_writer.writerow([i, reward, episode_len, sample_time, learn_time, elapsed, iter_time])
-        training_csv.flush()
-        
-        # 10イテレーションごとにチェックポイント保存
-        if (i + 1) % 10 == 0:
-            checkpoint_result = algo.save(checkpoint_dir)
-            print(f"💾 チェックポイント保存: {checkpoint_result.checkpoint.path}")
-    
-    training_csv.close()
-    
-    print("-" * 70)
-    
-    # 最終チェックポイント保存
-    checkpoint_result = algo.save(checkpoint_dir)
-    print(f"\n💾 最終チェックポイント保存: {checkpoint_result.checkpoint.path}")
+
+    save_result = algo.save(checkpoint_dir)
+    print(f"\n最終チェックポイント保存: {save_result.checkpoint.path}")
 
 except KeyboardInterrupt:
-    print("\n⚠️  学習が中断されました")
+    print("\n学習が中断されました")
 
 except Exception as e:
-    print(f"\n❌ エラーが発生しました: {e}")
+    print(f"\nエラーが発生しました: {e}")
     import traceback
     traceback.print_exc()
 
 finally:
-    # Choreonoidプロセスを終了
-    print("\n🛑 Choreonoidプロセスを終了中...")
+    print("\nChoreonoid プロセスを終了中...")
     for proc in choreonoid_processes:
         proc.terminate()
         proc.wait(timeout=5)
         print(f"  PID {proc.pid} 終了")
-    
+
     ray.shutdown()
-    
+
     print("\n" + "=" * 70)
-    print("✅ 学習完了！")
+    print("学習完了")
     print("=" * 70)
-    print(f"📁 チェックポイント: {checkpoint_dir}")
-    print(f"📈 学習統計CSV: {training_csv_filename}")
+    if 'checkpoint_dir' in locals():
+        print(f"  チェックポイント : {checkpoint_dir}")
+    if 'training_csv_filename' in locals():
+        print(f"  学習統計 CSV    : {training_csv_filename}")
     print("=" * 70)

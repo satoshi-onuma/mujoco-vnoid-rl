@@ -166,7 +166,7 @@ links:
       -
         type: Visual
         resource:
-          uri: "UpperarmP.stl"
+          uri: "UpperArmP.stl"
       -
         type: Collision
         elements:
@@ -192,7 +192,7 @@ links:
       -
         type: Visual
         resource:
-          uri: "UpperarmR.stl"
+          uri: "UpperArmR.stl"
       -
         type: Collision
         elements:
@@ -218,7 +218,7 @@ links:
       -
         type: Visual
         resource:
-          uri: "UpperarmY.stl"
+          uri: "UpperArmY.stl"
       -
         type: Collision
         elements:
@@ -247,7 +247,7 @@ links:
       -
         type: Visual
         resource:
-          uri: "LowerarmP.stl"
+          uri: "LowerArmP.stl"
       -
         type: Collision
         elements:
@@ -273,7 +273,7 @@ links:
       -
         type: Visual
         resource:
-          uri: "LowerarmY.stl"
+          uri: "LowerArmY.stl"
       -
         type: Collision
         elements:
@@ -354,7 +354,7 @@ links:
       -
         type: Visual
         resource:
-          uri: "UpperarmP.stl"
+          uri: "UpperArmP.stl"
       -
         type: Collision
         elements:
@@ -380,7 +380,7 @@ links:
       -
         type: Visual
         resource:
-          uri: "UpperarmR.stl"
+          uri: "UpperArmR.stl"
       -
         type: Collision
         elements:
@@ -406,7 +406,7 @@ links:
       -
         type: Visual
         resource:
-          uri: "UpperarmY.stl"
+          uri: "UpperArmY.stl"
       -
         type: Collision
         elements:
@@ -434,7 +434,7 @@ links:
       -
         type: Visual
         resource:
-          uri: "LowerarmP.stl"
+          uri: "LowerArmP.stl"
       -
         type: Collision
         elements:
@@ -460,7 +460,7 @@ links:
       -
         type: Visual
         resource:
-          uri: "LowerarmY.stl"
+          uri: "LowerArmY.stl"
       -
         type: Collision
         elements:
@@ -541,7 +541,7 @@ links:
       -
         type: Visual
         resource:
-          uri: "UpperlegY.stl"
+          uri: "UpperLegY.stl"
       -
         type: Collision
         elements:
@@ -567,7 +567,7 @@ links:
       -
         type: Visual
         resource:
-          uri: "UpperlegR.stl"
+          uri: "UpperLegR.stl"
       -
         type: Collision
         elements:
@@ -593,7 +593,7 @@ links:
       -
         type: Visual
         resource:
-          uri: "UpperlegP.stl"
+          uri: "UpperLegP.stl"
       -
         type: Collision
         elements:
@@ -621,7 +621,7 @@ links:
       -
         type: Visual
         resource:
-          uri: "LowerlegP.stl"
+          uri: "LowerLegP.stl"
       -
         type: Collision
         elements:
@@ -708,7 +708,7 @@ links:
       -
         type: Visual
         resource:
-          uri: "UpperlegY.stl"
+          uri: "UpperLegY.stl"
       -
         type: Collision
         elements:
@@ -734,7 +734,7 @@ links:
       -
         type: Visual
         resource:
-          uri: "UpperlegR.stl"
+          uri: "UpperLegR.stl"
       -
         type: Collision
         elements:
@@ -760,7 +760,7 @@ links:
       -
         type: Visual
         resource:
-          uri: "UpperlegP.stl"
+          uri: "UpperLegP.stl"
       -
         type: Collision
         elements:
@@ -788,7 +788,7 @@ links:
       -
         type: Visual
         resource:
-          uri: "LowerlegP.stl"
+          uri: "LowerLegP.stl"
       -
         type: Collision
         elements:

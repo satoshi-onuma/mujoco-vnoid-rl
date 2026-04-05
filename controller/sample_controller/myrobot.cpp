@@ -205,7 +205,8 @@ void MyRobot::Control(){
 
     // stepping controller generates swing foot trajectory 
     // it also performs landing position adaptation
-    stepping_controller.Update(timer, param, footstep, footstep_buffer, centroid, base, foot);
+    RLParams dummy_rl_params;  // End-to-End版では不要だが互換性のため
+    stepping_controller.Update(timer, param, footstep, footstep_buffer, centroid, base, foot, dummy_rl_params);
     
     // stabilizer performs balance feedback
     stabilizer         .Update(timer, param, /*footstep_buffer,*/ centroid, base, foot);
