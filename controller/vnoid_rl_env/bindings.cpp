@@ -9,6 +9,7 @@
 #include <iostream>
 #include <thread>
 #include <fstream>
+#include <random>
 
 namespace py = pybind11;
 using namespace cnoid::vnoid;
@@ -71,6 +72,13 @@ private:
     // 角運動量の時間微分計算用
     Vector3 prev_angular_momentum_com = Vector3(0.0, 0.0, 0.0);
     bool first_log = true;
+
+    // 地盤切り替え
+    int control_cycle_count = 0;
+    int terrain_switch_at = -1;
+    std::mt19937 terrain_rng{std::random_device{}()};
+    //高品質な乱数生成器　メルセンヌ・ツイスタ
+    //１から2^32-1までの整数を生成
 
 public:
     
@@ -316,7 +324,25 @@ public:
 
 private:
 
-
+    // 地盤パラメータ適用ヘルパー
+    void apply_terrain(double sr0, double sr1,
+                       double si0, double si1, double si2, double si3, double si4) {
+        if (!m) return;
+        int fid = mj_name2id(m, mjOBJ_GEOM, "floor");
+        if (fid < 0) return;
+        m->geom_solref[fid * 2 + 0] = sr0;
+        m->geom_solref[fid * 2 + 1] = sr1;
+        m->geom_solimp[fid * 5 + 0] = si0;
+        m->geom_solimp[fid * 5 + 1] = si1;
+        m->geom_solimp[fid * 5 + 2] = si2;
+        m->geom_solimp[fid * 5 + 3] = si3;
+        m->geom_solimp[fid * 5 + 4] = si4;
+        std::cout << "変わったよ！" << std::endl;
+        std::cout << "今のステップ数：" << control_cycle_count << std::endl;
+    }
+    void apply_hard_terrain() { apply_terrain(0.01, 100.0,  0.9, 0.99, 0.03, 0.5, 2.0); }
+    void apply_soft_terrain() { apply_terrain(0.1,  2.0,  0.7, 0.85, 0.003, 0.5, 2.0); }
+//solimp=".9 .99 .003" solref=".001 100"
     // ★ CoM速度を数値微分で計算
     Vector3 calc_com_velocity() {
         if (!robot) {
@@ -647,6 +673,15 @@ public:
         // ★ 角運動量の時間微分計算をリセット
         first_log = true;
         prev_angular_momentum_com = Vector3(0.0, 0.0, 0.0);
+
+        // 地盤切り替えリセット：硬地盤から開始し、ランダムなサイクルで軟地盤に切り替える
+        apply_hard_terrain();
+        std::uniform_int_distribution<int> dist(10000, 50000);
+        //500から2000までの整数を生成する変換器をインスタンス化
+        terrain_switch_at = dist(terrain_rng);
+        std::cout << "地盤切り替えステップ数：" << terrain_switch_at << std::endl;
+        //生成した乱数をシードとして入れる
+        control_cycle_count = 0;
     
         return get_observation();
     }
@@ -693,6 +728,10 @@ public:
             // ★ 制御サイクル実行（frame_skip回のmj_step）
             for (int i = 0; i < this->frame_skip; ++i) {
                 robot->Control(rl_params);
+                control_cycle_count++;
+                if (control_cycle_count == terrain_switch_at) {
+                    apply_soft_terrain();
+                }
                 mj_step(m, d);
 
                  // 毎ステップ転倒チェック

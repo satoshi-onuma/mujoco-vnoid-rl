@@ -36,7 +36,7 @@ class HumanoidVnoidEnv(gym.Env):
         "render_fps": 60,  # sample_controller_mujocoと同じ
     }
 
-    def __init__(self, enable_rendering=False, render_mode=None, max_episode_steps=50, **kwargs):
+    def __init__(self, enable_rendering=False, render_mode=None, max_episode_steps=500, **kwargs):
         super().__init__()
         
         # render_modeが指定されている場合は自動的にレンダリング有効化

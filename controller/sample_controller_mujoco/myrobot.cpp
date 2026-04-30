@@ -113,6 +113,7 @@ void MyRobot::Init(mjModel* _m, mjData* _d){
     joint[29].Set( 100.0,  20.0, 100.0);
     
     // init hardware (simulator interface)
+    //joint_pos_filter_cutoff = 30.0;   // 10.0 から（dt = 0.001）
 	RobotMujoco::Init(_m, _d, param, timer, joint);
 
     // set initial state
