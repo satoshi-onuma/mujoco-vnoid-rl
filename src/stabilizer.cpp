@@ -127,6 +127,22 @@ void Stabilizer::CalcForceDistribution(const Param& param, Centroid& centroid, v
 		foot[i].moment_ref[1] = -foot[i].force_ref.z() * foot[i].zmp_ref.x();
 		foot[i].moment_ref[2] =  foot[i].balance_ref * centroid.moment_ref.z();
 	}
+
+	/*
+	SteppingController
+  -> centroid.zmp_target / dcm_target / foot.contact_ref を決める
+
+Stabilizer::CalcDcmDynamics
+  -> centroid.zmp_ref を決める
+
+Stabilizer::Update
+  -> centroid.force_ref を決める
+
+Stabilizer::CalcForceDistribution
+  -> foot[i].balance_ref / foot[i].zmp_ref を決める
+  -> foot[i].force_ref / moment_ref を決める
+	*/
+	// これがIKに投げられてヤコビアンの逆よりu_refを決める
 }
 
 void Stabilizer::CalcBaseTilt(const Timer& timer, const Param& param, Base& base, Vector3 theta, Vector3 omega){
@@ -186,6 +202,9 @@ void Stabilizer::CalcDcmDynamics(const Timer& timer, const Param& param, const B
 	// calc zmp for regulating dcm
 	const double rate = 0.0;
 	centroid.zmp_ref = centroid.zmp_target + dcm_ctrl_gain*(centroid.dcm_ref - centroid.dcm_target) + rate*T*delta;
+
+	//ここでcentroid.zmp_refが決まる
+	// DCM安定化のために補正されたZMP
 
 	// project zmp inside support region
 	if( ( foot[0].contact_ref && !foot[1].contact_ref) ||

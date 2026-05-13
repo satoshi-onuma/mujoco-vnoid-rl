@@ -78,39 +78,43 @@ void MyRobot::Init(mjModel* _m, mjData* _d){
     // two hands and two feet
     foot.resize(2);
     hand.resize(2);
+    // 関節PD一括倍率（全体 a 倍なら3つとも a）。並びは従来どおり1行1関節。
+    constexpr double k_joint_pd_p   = 2.0;
+    constexpr double k_joint_pd_d   = 1.1;
+    constexpr double k_joint_ulimit = 1.0;
 
     // 30 joints
     joint.resize(30);
-    joint[ 0].Set(1000.0, 200.0, 100.0);
-    joint[ 1].Set(1000.0, 200.0, 100.0);
-    joint[ 2].Set(1000.0, 200.0, 100.0);
-    joint[ 3].Set(1000.0, 200.0, 100.0);
-    joint[ 4].Set(1000.0, 200.0, 100.0);
-    joint[ 5].Set(1000.0, 200.0, 100.0);
-    joint[ 6].Set(1000.0, 200.0, 100.0);
-    joint[ 7].Set(1000.0, 200.0, 100.0);
-    joint[ 8].Set(1000.0, 200.0, 100.0);
-    joint[ 9].Set(1000.0, 200.0, 100.0);
-    joint[10].Set(1000.0, 200.0, 100.0);
-    joint[11].Set(1000.0, 200.0, 100.0);
-    joint[12].Set(1000.0, 200.0, 100.0);
-    joint[13].Set(1000.0, 200.0, 100.0);
-    joint[14].Set(1000.0, 200.0, 100.0);
-    joint[15].Set(1000.0, 200.0, 100.0);
-    joint[16].Set(1000.0, 200.0, 100.0);
-    joint[17].Set(1000.0, 200.0, 100.0);
-    joint[18].Set(1000.0, 200.0, 100.0);
-    joint[19].Set(1000.0, 200.0, 100.0);
-    joint[20].Set(1000.0, 200.0, 100.0);
-    joint[21].Set(1000.0, 200.0, 100.0);
-    joint[22].Set( 100.0,  20.0, 100.0);
-    joint[23].Set( 100.0,  20.0, 100.0);
-    joint[24].Set(1000.0, 200.0, 100.0);
-    joint[25].Set(1000.0, 200.0, 100.0);
-    joint[26].Set(1000.0, 200.0, 100.0);
-    joint[27].Set(1000.0, 200.0, 100.0);
-    joint[28].Set( 100.0,  20.0, 100.0);
-    joint[29].Set( 100.0,  20.0, 100.0);
+    joint[ 0].Set(1000.0 * k_joint_pd_p, 200.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[ 1].Set(1000.0 * k_joint_pd_p, 200.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[ 2].Set(1000.0 * k_joint_pd_p, 200.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[ 3].Set(1000.0 * k_joint_pd_p, 200.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[ 4].Set(1000.0 * k_joint_pd_p, 200.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[ 5].Set(1000.0 * k_joint_pd_p, 200.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[ 6].Set(1000.0 * k_joint_pd_p, 200.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[ 7].Set(1000.0 * k_joint_pd_p, 200.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[ 8].Set(1000.0 * k_joint_pd_p, 200.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[ 9].Set(1000.0 * k_joint_pd_p, 200.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[10].Set(1000.0 * k_joint_pd_p, 200.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[11].Set(1000.0 * k_joint_pd_p, 200.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[12].Set(1000.0 * k_joint_pd_p, 200.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[13].Set(1000.0 * k_joint_pd_p, 200.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[14].Set(1000.0 * k_joint_pd_p, 200.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[15].Set(1000.0 * k_joint_pd_p, 200.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[16].Set(1000.0 * k_joint_pd_p, 200.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[17].Set(1000.0 * k_joint_pd_p, 200.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[18].Set(1000.0 * k_joint_pd_p, 200.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[19].Set(1000.0 * k_joint_pd_p, 200.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[20].Set(1000.0 * k_joint_pd_p, 200.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[21].Set(1000.0 * k_joint_pd_p, 200.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[22].Set( 100.0 * k_joint_pd_p,  20.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[23].Set( 100.0 * k_joint_pd_p,  20.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[24].Set(1000.0 * k_joint_pd_p, 200.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[25].Set(1000.0 * k_joint_pd_p, 200.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[26].Set(1000.0 * k_joint_pd_p, 200.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[27].Set(1000.0 * k_joint_pd_p, 200.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[28].Set( 100.0 * k_joint_pd_p,  20.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
+    joint[29].Set( 100.0 * k_joint_pd_p,  20.0 * k_joint_pd_d, 100.0 * k_joint_ulimit);
     
     // init hardware (simulator interface)
     //joint_pos_filter_cutoff = 30.0;   // 10.0 から（dt = 0.001）

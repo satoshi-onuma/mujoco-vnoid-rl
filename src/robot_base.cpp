@@ -190,6 +190,7 @@ RobotBase::RobotBase(){
     foot_force_filter_cutoff  = 20.0;
     foot_moment_filter_cutoff = 20.0;
     joint_pos_filter_cutoff   = 10.0;
+	// filter.cppのインスタンス化したjoint_pos_filterとかに送るcutoffを決定
 	
 }
 

@@ -729,9 +729,9 @@ public:
             for (int i = 0; i < this->frame_skip; ++i) {
                 robot->Control(rl_params);
                 control_cycle_count++;
-                if (control_cycle_count == terrain_switch_at) {
-                    apply_soft_terrain();
-                }
+                // if (control_cycle_count == terrain_switch_at) {
+                //     apply_soft_terrain();
+                // }
                 mj_step(m, d);
 
                  // 毎ステップ転倒チェック

@@ -1,7 +1,5 @@
-<!-- this is original sample_robot_mujoco.xml -->
-
 <mujoco model="sample_robot">
-  <option timestep="0.001"/>
+  <option timestep="0.0001"/>
 
   <visual>
     <map force="0.1" zfar="30"/>
@@ -39,8 +37,7 @@
   </asset>
 
   <default>
-    <motor ctrlrange="-100 100" ctrllimited="true"/>
-    <geom condim="3" friction="1" solimp=".9 .99 .003" solref=".01 1" material="body" group="1"/>
+    <geom condim="3" friction="1" solimp=".9 .99 .003" solref=".001 100" material="body" group="1"/>
     <joint type="hinge" damping=".0" stiffness="0" armature=".01" limited="true" solimplimit="0 .99 .01"/>
   </default>
 
@@ -226,36 +223,36 @@
   </sensor>
 
   <actuator>
-    <motor name="CHEST_Y"       joint="CHEST_Y"/>
-    <motor name="CHEST_P"       joint="CHEST_P"/>
-    <motor name="HEAD_Y"        joint="HEAD_Y"/>
-    <motor name="HEAD_P"        joint="HEAD_P"/>
-    <motor name="R_UPPERARM_P"  joint="R_UPPERARM_P"/>
-    <motor name="R_UPPERARM_R"  joint="R_UPPERARM_R"/>
-    <motor name="R_UPPERARM_Y"  joint="R_UPPERARM_Y"/>
-    <motor name="R_LOWERARM_P"  joint="R_LOWERARM_P"/>
-    <motor name="R_LOWERARM_Y"  joint="R_LOWERARM_Y"/>
-    <motor name="R_HAND_P"      joint="R_HAND_P"/>
-    <motor name="R_HAND_R"      joint="R_HAND_R"/>
-    <motor name="L_UPPERARM_P"  joint="L_UPPERARM_P"/>
-    <motor name="L_UPPERARM_R"  joint="L_UPPERARM_R"/>
-    <motor name="L_UPPERARM_Y"  joint="L_UPPERARM_Y"/>
-    <motor name="L_LOWERARM_P"  joint="L_LOWERARM_P"/>
-    <motor name="L_LOWERARM_Y"  joint="L_LOWERARM_Y"/>
-    <motor name="L_HAND_P"      joint="L_HAND_P"/>
-    <motor name="L_HAND_R"      joint="L_HAND_R"/>
-    <motor name="R_UPPERLEG_Y"  joint="R_UPPERLEG_Y"/>
-    <motor name="R_UPPERLEG_R"  joint="R_UPPERLEG_R"/>
-    <motor name="R_UPPERLEG_P"  joint="R_UPPERLEG_P"/>
-    <motor name="R_LOWERLEG_P"  joint="R_LOWERLEG_P"/>
-    <motor name="R_FOOT_P"      joint="R_FOOT_P"/>
-    <motor name="R_FOOT_R"      joint="R_FOOT_R"/>
-    <motor name="L_UPPERLEG_Y"  joint="L_UPPERLEG_Y"/>
-    <motor name="L_UPPERLEG_R"  joint="L_UPPERLEG_R"/>
-    <motor name="L_UPPERLEG_P"  joint="L_UPPERLEG_P"/>
-    <motor name="L_LOWERLEG_P"  joint="L_LOWERLEG_P"/>
-    <motor name="L_FOOT_P"      joint="L_FOOT_P"/>
-    <motor name="L_FOOT_R"      joint="L_FOOT_R"/>
+    <position name="CHEST_Y"       joint="CHEST_Y"       kp="1000" kv="200"/>
+    <position name="CHEST_P"       joint="CHEST_P"       kp="1000" kv="200"/>
+    <position name="HEAD_Y"        joint="HEAD_Y"        kp="1000" kv="200"/>
+    <position name="HEAD_P"        joint="HEAD_P"        kp="1000" kv="200"/>
+    <position name="R_UPPERARM_P"  joint="R_UPPERARM_P"  kp="1000" kv="200"/>
+    <position name="R_UPPERARM_R"  joint="R_UPPERARM_R"  kp="1000" kv="200"/>
+    <position name="R_UPPERARM_Y"  joint="R_UPPERARM_Y"  kp="1000" kv="200"/>
+    <position name="R_LOWERARM_P"  joint="R_LOWERARM_P"  kp="1000" kv="200"/>
+    <position name="R_LOWERARM_Y"  joint="R_LOWERARM_Y"  kp="1000" kv="200"/>
+    <position name="R_HAND_P"      joint="R_HAND_P"      kp="1000" kv="200"/>
+    <position name="R_HAND_R"      joint="R_HAND_R"      kp="1000" kv="200"/>
+    <position name="L_UPPERARM_P"  joint="L_UPPERARM_P"  kp="1000" kv="200"/>
+    <position name="L_UPPERARM_R"  joint="L_UPPERARM_R"  kp="1000" kv="200"/>
+    <position name="L_UPPERARM_Y"  joint="L_UPPERARM_Y"  kp="1000" kv="200"/>
+    <position name="L_LOWERARM_P"  joint="L_LOWERARM_P"  kp="1000" kv="200"/>
+    <position name="L_LOWERARM_Y"  joint="L_LOWERARM_Y"  kp="1000" kv="200"/>
+    <position name="L_HAND_P"      joint="L_HAND_P"      kp="1000" kv="200"/>
+    <position name="L_HAND_R"      joint="L_HAND_R"      kp="1000" kv="200"/>
+    <position name="R_UPPERLEG_Y"  joint="R_UPPERLEG_Y"  kp="1000" kv="200"/>
+    <position name="R_UPPERLEG_R"  joint="R_UPPERLEG_R"  kp="1000" kv="200"/>
+    <position name="R_UPPERLEG_P"  joint="R_UPPERLEG_P"  kp="1000" kv="200"/>
+    <position name="R_LOWERLEG_P"  joint="R_LOWERLEG_P"  kp="1000" kv="200"/>
+    <position name="R_FOOT_P"      joint="R_FOOT_P"      kp="100"  kv="20"/>
+    <position name="R_FOOT_R"      joint="R_FOOT_R"      kp="100"  kv="20"/>
+    <position name="L_UPPERLEG_Y"  joint="L_UPPERLEG_Y"  kp="1000" kv="200"/>
+    <position name="L_UPPERLEG_R"  joint="L_UPPERLEG_R"  kp="1000" kv="200"/>
+    <position name="L_UPPERLEG_P"  joint="L_UPPERLEG_P"  kp="1000" kv="200"/>
+    <position name="L_LOWERLEG_P"  joint="L_LOWERLEG_P"  kp="1000" kv="200"/>
+    <position name="L_FOOT_P"      joint="L_FOOT_P"      kp="100"  kv="20"/>
+    <position name="L_FOOT_R"      joint="L_FOOT_R"      kp="100"  kv="20"/>
   </actuator>
 
   <contact>

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 
 #include "robot_base.h"
 
@@ -56,8 +56,9 @@ public:
 	 * @param base   Base link object. 
 	 *               If base_actuation is true, its reference position and orientation are directly reflected to the pose of the base link in simulation.
 	 *   			 Otherwise, it is not used.
-	 * @param joint  Array of joint objects. 
-	 *               The torque command of each joint is calculated and commanded to the simulator.
+	 * @param joint  Array of joint objects.
+	 *               For MuJoCo, each joint uses three actuators (position, velocity, motor torque);
+	 *               ctrl[3*i+0]=q_ref, ctrl[3*i+1]=dq_ref, ctrl[3*i+2]=u_ref.
 	 * 
 	 **/
 	void  Actuate(Timer& timer, Base& base, vector<Joint>& joint);

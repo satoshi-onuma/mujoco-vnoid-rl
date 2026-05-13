@@ -39,7 +39,7 @@ double Filter::operator()(double _u, double dt){
     if(type == Type::None){
         y = u;
     }
-    if(type == Type::FirstOrderLPF){
+    if(type == Type::FirstOrderLPF){//一次ローパスフィルタ
         yd   = -w*(y - u);
 
         if(yd_max > 0.0){
@@ -48,7 +48,7 @@ double Filter::operator()(double _u, double dt){
 
         y += yd*dt;
     }
-    if(type == Type::FirstOrderLPF2){
+    if(type == Type::FirstOrderLPF2){//指数移動平均
         double a = exp(-w*dt);
         y    = a*y + (1.0 - a)*u;
     }

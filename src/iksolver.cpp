@@ -330,6 +330,8 @@ void IkSolver::Comp(FkSolver* fk_solver, const Param& param, Centroid& centroid,
         F[5] = mref.z();
 
         tau = J.transpose()*F;
+
+        //ここで計算したtauがu_refとしてjointに投げられる
         //printf("F  : %f %f %f %f %f %f\n", F[0], F[1], F[2], F[3], F[4], F[5]);
         //printf("tau: %f %f %f %f %f %f\n", tau[0], tau[1], tau[2], tau[3], tau[4], tau[5]);
 
