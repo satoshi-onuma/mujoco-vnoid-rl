@@ -173,9 +173,11 @@ Timer::Timer(){
 
 void Timer::Countup(){
 	count++;
+	
+}
+void Timer::Stepup(){
 	time += dt;
 }
-
 ///////////////////////////////////////////////////////////////////////////////////////////////////
 
 RobotBase::RobotBase(){

@@ -28,7 +28,10 @@ static bool button_right = false;
 static double lastx = 0;
 static double lasty = 0;
 
-
+struct FootState {
+    double pos[3];
+    double vel[6];  // linvel(3) + angvel(3), world frame
+};
 
 // ★★★ シンプル設計のVnoidEnv ★★★
 class VnoidEnv {
@@ -77,6 +80,10 @@ private:
     int control_cycle_count = 0;
     int terrain_switch_at = -1;
     std::mt19937 terrain_rng{std::random_device{}()};
+
+    // MuJoCo 足 body ID（ログ・デバッグ用）
+    int bid_r_foot = -1;
+    int bid_l_foot = -1;
     //高品質な乱数生成器　メルセンヌ・ツイスタ
     //１から2^32-1までの整数を生成
 
@@ -103,6 +110,7 @@ public:
         // ロボットコントローラ初期化
         robot = std::make_unique<MyRobot>();
         robot->Init(m, d);
+        initFootBodyIds();
         
         // 1/60秒 = 0.01667秒をシミュレーション時間で進める
         const double render_period = 1.0 / 60.0;  // 60fps
@@ -156,7 +164,21 @@ public:
                          << "obs_acc_x,obs_acc_y,obs_acc_z,"
                          << "obs_foot_height_right,obs_foot_height_left,"
                          << "foot_pos_right_x,foot_pos_right_y,foot_pos_right_z,"
-                         << "foot_pos_left_x,foot_pos_left_y,foot_pos_left_z"
+                         << "foot_pos_left_x,foot_pos_left_y,foot_pos_left_z,"
+                         << "mj_foot_r_pos_x,mj_foot_r_pos_y,mj_foot_r_pos_z,"
+                         << "mj_foot_r_linvel_x,mj_foot_r_linvel_y,mj_foot_r_linvel_z,"
+                         << "mj_foot_r_angvel_x,mj_foot_r_angvel_y,mj_foot_r_angvel_z,"
+                         << "mj_foot_l_pos_x,mj_foot_l_pos_y,mj_foot_l_pos_z,"
+                         << "mj_foot_l_linvel_x,mj_foot_l_linvel_y,mj_foot_l_linvel_z,"
+                         << "mj_foot_l_angvel_x,mj_foot_l_angvel_y,mj_foot_l_angvel_z,"
+                         << "joint_R_UPPERLEG_Y_q,joint_R_UPPERLEG_R_q,joint_R_UPPERLEG_P_q,"
+                         << "joint_R_LOWERLEG_P_q,joint_R_FOOT_P_q,joint_R_FOOT_R_q,"
+                         << "joint_L_UPPERLEG_Y_q,joint_L_UPPERLEG_R_q,joint_L_UPPERLEG_P_q,"
+                         << "joint_L_LOWERLEG_P_q,joint_L_FOOT_P_q,joint_L_FOOT_R_q,"
+                         << "joint_R_UPPERLEG_Y_dq,joint_R_UPPERLEG_R_dq,joint_R_UPPERLEG_P_dq,"
+                         << "joint_R_LOWERLEG_P_dq,joint_R_FOOT_P_dq,joint_R_FOOT_R_dq,"
+                         << "joint_L_UPPERLEG_Y_dq,joint_L_UPPERLEG_R_dq,joint_L_UPPERLEG_P_dq,"
+                         << "joint_L_LOWERLEG_P_dq,joint_L_FOOT_P_dq,joint_L_FOOT_R_dq"
                          << std::endl;
                 
                 csv_file.flush();  // 即座に書き込む
@@ -343,6 +365,27 @@ private:
     void apply_hard_terrain() { apply_terrain(0.01, 100.0,  0.9, 0.99, 0.03, 0.5, 2.0); }
     void apply_soft_terrain() { apply_terrain(0.1,  2.0,  0.7, 0.85, 0.003, 0.5, 2.0); }
 //solimp=".9 .99 .003" solref=".001 100"
+
+    void initFootBodyIds() {
+        bid_r_foot = mj_name2id(m, mjOBJ_BODY, "R_FOOT_R");
+        bid_l_foot = mj_name2id(m, mjOBJ_BODY, "L_FOOT_R");
+        if (bid_r_foot < 0 || bid_l_foot < 0) {
+            std::cerr << "[WARNING] Foot body ID not found: R_FOOT_R=" << bid_r_foot
+                      << " L_FOOT_R=" << bid_l_foot << std::endl;
+        }
+    }
+
+    FootState get_foot_state(int bid) {
+        FootState fs{};
+        if (!m || !d || bid < 0) {
+            return fs;
+        }
+        fs.pos[0] = d->xpos[3 * bid + 0];
+        fs.pos[1] = d->xpos[3 * bid + 1];
+        fs.pos[2] = d->xpos[3 * bid + 2];
+        mj_objectVelocity(m, d, mjOBJ_BODY, bid, fs.vel, 0);
+        return fs;
+    }
     // ★ CoM速度を数値微分で計算
     Vector3 calc_com_velocity() {
         if (!robot) {
@@ -491,6 +534,10 @@ private:
         // 回復モーメントとの差を計算（ローカル座標系）
         Vector3 moment_diff = angular_moment_local - Ld_local;
         
+        // MuJoCo から足位置・速度を直接取得
+        FootState mj_foot_r = get_foot_state(bid_r_foot);
+        FootState mj_foot_l = get_foot_state(bid_l_foot);
+
         // zmp_localを計算（単脚支持時のみ）
         Vector3 zmp_local = Vector3(0.0, 0.0, 0.0);
         if ((robot->foot[0].contact_ref && !robot->foot[1].contact_ref) ||
@@ -535,8 +582,22 @@ private:
                  << robot->base.acc[0] << "," << robot->base.acc[1] << "," << robot->base.acc[2] << ","
                  << robot->foot[0].pos_ref[2] << "," << robot->foot[1].pos_ref[2] << ","
                  << robot->foot[0].pos[0] << "," << robot->foot[0].pos[1] << "," << robot->foot[0].pos[2] << ","
-                 << robot->foot[1].pos[0] << "," << robot->foot[1].pos[1] << "," << robot->foot[1].pos[2]
-                 << std::endl;
+                 << robot->foot[1].pos[0] << "," << robot->foot[1].pos[1] << "," << robot->foot[1].pos[2] << ","
+                 << mj_foot_r.pos[0] << "," << mj_foot_r.pos[1] << "," << mj_foot_r.pos[2] << ","
+                 << mj_foot_r.vel[0] << "," << mj_foot_r.vel[1] << "," << mj_foot_r.vel[2] << ","
+                 << mj_foot_r.vel[3] << "," << mj_foot_r.vel[4] << "," << mj_foot_r.vel[5] << ","
+                 << mj_foot_l.pos[0] << "," << mj_foot_l.pos[1] << "," << mj_foot_l.pos[2] << ","
+                 << mj_foot_l.vel[0] << "," << mj_foot_l.vel[1] << "," << mj_foot_l.vel[2] << ","
+                 << mj_foot_l.vel[3] << "," << mj_foot_l.vel[4] << "," << mj_foot_l.vel[5];
+        // 脚部関節角度 (i=18..29)
+        for (int i = 18; i < 30; i++) {
+            csv_file << "," << robot->joint[i].q;
+        }
+        // 脚部関節角速度 (i=18..29)
+        for (int i = 18; i < 30; i++) {
+            csv_file << "," << robot->joint[i].dq;
+        }
+        csv_file << std::endl;
         
         // 定期的にflush（例：100回に1回）
         static int log_count = 0;
@@ -549,6 +610,7 @@ private:
     void initializeRobot() {
         robot = std::make_unique<MyRobot>();
         robot->Init(m, d);
+        initFootBodyIds();
     }
 
     // ★★★ sample_controller_mujocoと同じGLFW初期化 ★★★
@@ -584,6 +646,9 @@ private:
         // ★★★ sample_controller_mujocoと同じ初期化 ★★★
         mjv_defaultCamera(&cam);
         mjv_defaultOption(&opt);
+        opt.flags[mjVIS_CONTACTPOINT] = 1;
+        opt.flags[mjVIS_CONTACTFORCE] = 1;
+        opt.sitegroup[1] = 1;  // r_foot_marker / l_foot_marker (group=1)
         mjv_defaultScene(&scn);     // ← これが足りない！
         mjr_defaultContext(&con);
         
@@ -659,6 +724,7 @@ public:
         // ロボットも完全に再初期化
         robot = std::make_unique<MyRobot>();
         robot->Init(m, d);
+        initFootBodyIds();
     
         mj_forward(m, d);
         previous_x = d->qpos[0];
@@ -733,18 +799,20 @@ public:
                 //     apply_soft_terrain();
                 // }
                 mj_step(m, d);
-
-                 // 毎ステップ転倒チェック
-                double hips_z = d->qpos[2];
-                if (hips_z < MIN_HEIGHT) {
-                    terminated = true;
-                    break;
-                }
-
-                // ★ 毎制御サイクルでログ記録
-                log_control_data();
                 
-            }
+                if (control_cycle_count % robot->param.control_cycle == 0) {
+                    
+                    // 毎ステップ転倒チェック
+                    double hips_z = d->qpos[2];
+                    if (hips_z < MIN_HEIGHT) {
+                        terminated = true;
+                        break;
+                    }
+
+                    // ★ 毎制御サイクルでログ記録
+                    log_control_data();
+                }
+                }
 
             if (terminated) break;
         
@@ -763,8 +831,17 @@ public:
             // 1歩完了を検出
             int current_support_leg = robot->footstep_buffer.steps[0].side;
             step_completed = (current_support_leg != prev_support_leg);
-
+            
+            //デバッグ用
+            //step_counterが100の倍数のときはstep_completedをtrueにする
+            //歩いてないけど擬似的に支持脚が変わったことにする
             step_counter++;
+            if (step_counter % 100 == 0) {
+                step_completed = true;
+            }else{
+                step_completed = false;
+            }
+
 
             if (step_counter  >= MAX_ITERATIONS) {
                 terminated = true;
@@ -822,10 +899,10 @@ public:
         
         try {
 
-            // カメラをロボットに追従させる、必要ないときは消せ
-            cam.lookat[0] = d->qpos[0];  // X座標
-            cam.lookat[1] = d->qpos[1];  // Y座標
-            cam.lookat[2] = d->qpos[2];  // Z座標
+            // // カメラをロボットに追従させる、必要ないときは消せ
+            // cam.lookat[0] = d->qpos[0];  // X座標
+            // cam.lookat[1] = d->qpos[1];  // Y座標
+            // cam.lookat[2] = d->qpos[2];  // Z座標
 
 
             // 録画用の固定ビューポート

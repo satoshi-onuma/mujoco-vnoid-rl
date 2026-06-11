@@ -775,6 +775,68 @@ def plot_dcm_offset_analysis(log):
     #plt.show()
 
 
+def plot_mj_foot_analysis(log):
+    """MuJoCo直読みの足位置・速度（震え確認用）"""
+
+    def has_key(key):
+        return key in log and len(log[key]) > 0
+
+    if not has_key('mj_foot_r_pos_x'):
+        print("⚠️ mj_foot_* 列がありません（新しい control_log.csv が必要です）")
+        return
+
+    print(f"\n📊 MuJoCo足データグラフ生成中... ({len(log['time'])} サンプル)")
+
+    fig = plt.figure(figsize=(15, 12))
+
+    # --- パネル1: 足位置 ---
+    plt.subplot(3, 1, 1)
+    plt.plot(log['time'], log['mj_foot_r_pos_x'], 'r-', label='R pos X', linewidth=1.5)
+    plt.plot(log['time'], log['mj_foot_r_pos_y'], 'r--', label='R pos Y', linewidth=1.5)
+    plt.plot(log['time'], log['mj_foot_r_pos_z'], 'r:', label='R pos Z', linewidth=1.5)
+    plt.plot(log['time'], log['mj_foot_l_pos_x'], 'b-', label='L pos X', linewidth=1.5)
+    plt.plot(log['time'], log['mj_foot_l_pos_y'], 'b--', label='L pos Y', linewidth=1.5)
+    plt.plot(log['time'], log['mj_foot_l_pos_z'], 'b:', label='L pos Z', linewidth=1.5)
+    plt.xlabel('Time [s]')
+    plt.ylabel('Position [m]')
+    plt.title('MuJoCo Foot Position (R_FOOT_R / L_FOOT_R body)')
+    plt.legend(fontsize=8, ncol=2)
+    plt.grid(True, alpha=0.3)
+
+    # --- パネル2: 並進速度 ---
+    plt.subplot(3, 1, 2)
+    plt.plot(log['time'], log['mj_foot_r_linvel_x'], 'r-', label='R linvel X', linewidth=1.5)
+    plt.plot(log['time'], log['mj_foot_r_linvel_y'], 'r--', label='R linvel Y', linewidth=1.5)
+    plt.plot(log['time'], log['mj_foot_r_linvel_z'], 'r:', label='R linvel Z', linewidth=1.5)
+    plt.plot(log['time'], log['mj_foot_l_linvel_x'], 'b-', label='L linvel X', linewidth=1.5)
+    plt.plot(log['time'], log['mj_foot_l_linvel_y'], 'b--', label='L linvel Y', linewidth=1.5)
+    plt.plot(log['time'], log['mj_foot_l_linvel_z'], 'b:', label='L linvel Z', linewidth=1.5)
+    plt.xlabel('Time [s]')
+    plt.ylabel('Velocity [m/s]')
+    plt.title('MuJoCo Foot Linear Velocity')
+    plt.legend(fontsize=8, ncol=2)
+    plt.grid(True, alpha=0.3)
+
+    # --- パネル3: 角速度（震えの主指標） ---
+    plt.subplot(3, 1, 3)
+    plt.plot(log['time'], log['mj_foot_r_angvel_x'], 'r-', label='R angvel X', linewidth=1.5)
+    plt.plot(log['time'], log['mj_foot_r_angvel_y'], 'r--', label='R angvel Y', linewidth=1.5)
+    plt.plot(log['time'], log['mj_foot_r_angvel_z'], 'r:', label='R angvel Z', linewidth=1.5)
+    plt.plot(log['time'], log['mj_foot_l_angvel_x'], 'b-', label='L angvel X', linewidth=1.5)
+    plt.plot(log['time'], log['mj_foot_l_angvel_y'], 'b--', label='L angvel Y', linewidth=1.5)
+    plt.plot(log['time'], log['mj_foot_l_angvel_z'], 'b:', label='L angvel Z', linewidth=1.5)
+    plt.xlabel('Time [s]')
+    plt.ylabel('Angular velocity [rad/s]')
+    plt.title('MuJoCo Foot Angular Velocity (vibration check)')
+    plt.legend(fontsize=8, ncol=2)
+    plt.grid(True, alpha=0.3)
+
+    plt.tight_layout()
+    plt.savefig('control_analysis_mj_foot.pdf', bbox_inches='tight')
+    plt.savefig('control_analysis_mj_foot.png', dpi=150, bbox_inches='tight')
+    print("💾 グラフ保存: control_analysis_mj_foot.pdf / .png")
+
+
 if __name__ == "__main__":
     print("=" * 70)
     print("📊 制御データのプロット（CSV版）")
@@ -791,6 +853,7 @@ if __name__ == "__main__":
     if log is not None and len(log.get('time', [])) > 0:
         plot_control_analysis(log)
         plot_dcm_offset_analysis(log)
+        plot_mj_foot_analysis(log)
     else:
         print("⚠️ ログデータが空です")
     

@@ -17,6 +17,21 @@ plt.rcParams['legend.fontsize'] = 11
 plt.rcParams['figure.dpi'] = 150
 plt.rcParams['lines.linewidth'] = 1.5
 
+DEFAULT_TIME_AXIS_LIMITS = (-1.0, 21.0)
+DEFAULT_COM_X_LIMITS = (-0.5, 5.0)
+DEFAULT_COM_Y_LIMITS = (-1.7, 1.0)
+SPECIAL_TIME_RANGE = (0.0, 10.0)
+SPECIAL_COM_X_LIMITS = (-0.5, 2.5)
+SPECIAL_COM_Y_LIMITS = (-2.0, 2.0)
+SPECIAL_VIEW_FLAG = "--special-com-view"
+
+
+def resolve_time_axis_limits(time_range):
+    """描画用の時間軸範囲を返す"""
+    if time_range is not None:
+        return time_range
+    return DEFAULT_TIME_AXIS_LIMITS
+
 def load_csv_log(csv_filename="control_log.csv"):
     """CSVファイルからログデータを読み込む"""
     if not os.path.exists(csv_filename):
@@ -41,7 +56,7 @@ def load_csv_log(csv_filename="control_log.csv"):
     return log
 
 
-def plot_com_position_thesis(log, output_dir=".", time_range=None):
+def plot_com_position_thesis(log, output_dir=".", time_range=None, special_view=False):
     """
     卒論用：CoM位置のプロット（X, Y, Z, Top Viewの4枚）
     実測値と所望値を比較
@@ -55,6 +70,8 @@ def plot_com_position_thesis(log, output_dir=".", time_range=None):
         出力ディレクトリ
     time_range : tuple or None
         プロット範囲 (t_min, t_max)。Noneの場合は全範囲
+    special_view : bool
+        Trueの場合、特例の表示範囲 (t=0-10, x=0-4, y=-2-2) を使用
     """
     
     if len(log['time']) == 0:
@@ -91,6 +108,14 @@ def plot_com_position_thesis(log, output_dir=".", time_range=None):
         foot_pos_right_z = np.array(log['foot_pos_right_z'])
     
     print(f"   時間範囲: {t_min:.2f} - {t_max:.2f} 秒")
+
+    time_axis_limits = resolve_time_axis_limits(time_range)
+    if special_view:
+        com_x_limits = SPECIAL_COM_X_LIMITS
+        com_y_limits = SPECIAL_COM_Y_LIMITS
+    else:
+        com_x_limits = DEFAULT_COM_X_LIMITS
+        com_y_limits = DEFAULT_COM_Y_LIMITS
     
     # 出力ディレクトリの作成
     os.makedirs(output_dir, exist_ok=True)
@@ -101,8 +126,8 @@ def plot_com_position_thesis(log, output_dir=".", time_range=None):
     ax1.plot(time, com_pos_ref_x, 'k--', linewidth=2.0, label='Desired')
     ax1.set_xlabel('Time [s]')
     ax1.set_ylabel('CoM Position X [m]')
-    ax1.set_xlim(-1, 21)
-    ax1.set_ylim(-0.5, 5.0)
+    ax1.set_xlim(*time_axis_limits)
+    ax1.set_ylim(*com_x_limits)
     ax1.legend(loc='upper left', frameon=False)
     ax1.tick_params(direction='in')
     plt.tight_layout()
@@ -118,8 +143,8 @@ def plot_com_position_thesis(log, output_dir=".", time_range=None):
     ax2.plot(time, com_pos_ref_y, 'k--', linewidth=2.0, label='Desired')
     ax2.set_xlabel('Time [s]')
     ax2.set_ylabel('CoM Position Y [m]')
-    ax2.set_xlim(-1, 21)
-    ax2.set_ylim(-1.7, 1.0)
+    ax2.set_xlim(*time_axis_limits)
+    ax2.set_ylim(*com_y_limits)
     ax2.legend(loc='upper left', frameon=False)
     ax2.tick_params(direction='in')
     plt.tight_layout()
@@ -140,7 +165,7 @@ def plot_com_position_thesis(log, output_dir=".", time_range=None):
     ax3.axhline(y=0, color='gray', linestyle='-', linewidth=1.0, alpha=0.5, label='Ground')
     ax3.set_xlabel('Time [s]')
     ax3.set_ylabel('CoM Position Z [m]')
-    ax3.set_xlim(-1, 21)
+    ax3.set_xlim(*time_axis_limits)
     ax3.set_ylim(-0.1, 1.1)
     ax3.legend(loc='upper right', frameon=False)
     ax3.tick_params(direction='in')
@@ -158,8 +183,8 @@ def plot_com_position_thesis(log, output_dir=".", time_range=None):
     
     ax4.set_xlabel('CoM Position X [m]')
     ax4.set_ylabel('CoM Position Y [m]')
-    ax4.set_xlim(-0.5, 5.0)
-    ax4.set_ylim(-1.7, 1.0)
+    ax4.set_xlim(*com_x_limits)
+    ax4.set_ylim(*com_y_limits)
     ax4.legend(loc='upper left', frameon=False)
     ax4.tick_params(direction='in')
     plt.tight_layout()
@@ -206,13 +231,14 @@ def plot_rl_action_thesis(log, output_dir=".", time_range=None):
         rl_action_y = np.array(log['rl_action_foot_offset_y'])
     
     os.makedirs(output_dir, exist_ok=True)
+    time_axis_limits = resolve_time_axis_limits(time_range)
     
     # --- グラフ1: RL Action X ---
     fig1, ax1 = plt.subplots(figsize=(10, 4))
     ax1.plot(time, rl_action_x, 'b-', linewidth=1.5)
     ax1.set_xlabel('Time [s]')
     ax1.set_ylabel('RL Action Foot Offset X [m]')
-    ax1.set_xlim(-1, 21)
+    ax1.set_xlim(*time_axis_limits)
     ax1.set_ylim(-0.16, 0.01)
     ax1.tick_params(direction='in')
     plt.tight_layout()
@@ -227,7 +253,7 @@ def plot_rl_action_thesis(log, output_dir=".", time_range=None):
     ax2.plot(time, rl_action_y, 'b-', linewidth=1.5)
     ax2.set_xlabel('Time [s]')
     ax2.set_ylabel('RL Action Foot Offset Y [m]')
-    ax2.set_xlim(-1, 21)
+    ax2.set_xlim(*time_axis_limits)
     ax2.set_ylim(-0.11, 0.11)
     ax2.tick_params(direction='in')
     plt.tight_layout()
@@ -279,6 +305,7 @@ def plot_dcm_offset_thesis(log, output_dir=".", time_range=None):
         dcm_offset_desired_y = np.array(log['dcm_offset_desired_y'])
     
     os.makedirs(output_dir, exist_ok=True)
+    time_axis_limits = resolve_time_axis_limits(time_range)
     
     # --- グラフ1: DCM Offset X（実測値 vs 所望値） ---
     fig1, ax1 = plt.subplots(figsize=(10, 4))
@@ -286,7 +313,7 @@ def plot_dcm_offset_thesis(log, output_dir=".", time_range=None):
     ax1.plot(time, dcm_offset_desired_x, 'k--', linewidth=1.5, label='Desired')
     ax1.set_xlabel('Time [s]')
     ax1.set_ylabel('DCM Offset X [m]')
-    ax1.set_xlim(-1, 21)
+    ax1.set_xlim(*time_axis_limits)
     ax1.set_ylim(-0.6, 0.6)
     ax1.legend(loc='upper left', frameon=False)
     ax1.tick_params(direction='in')
@@ -303,7 +330,7 @@ def plot_dcm_offset_thesis(log, output_dir=".", time_range=None):
     ax2.plot(time, dcm_offset_desired_y, 'k--', linewidth=1.5, label='Desired')
     ax2.set_xlabel('Time [s]')
     ax2.set_ylabel('DCM Offset Y [m]')
-    ax2.set_xlim(-1, 21)
+    ax2.set_xlim(*time_axis_limits)
     ax2.set_ylim(-0.6, 0.6)
     ax2.legend(loc='upper left', frameon=False)
     ax2.tick_params(direction='in')
@@ -361,6 +388,7 @@ def plot_moment_thesis(log, output_dir=".", time_range=None):
         moment_diff_y = np.array(log['moment_diff_y'])
     
     os.makedirs(output_dir, exist_ok=True)
+    time_axis_limits = resolve_time_axis_limits(time_range)
     
     # --- グラフ1: Recovery Moment X（実測値 vs 所望値） ---
     fig1, ax1 = plt.subplots(figsize=(10, 4))
@@ -368,7 +396,7 @@ def plot_moment_thesis(log, output_dir=".", time_range=None):
     ax1.plot(time, recovery_moment_x, 'k--', linewidth=1.5, label='Desired')
     ax1.set_xlabel('Time [s]')
     ax1.set_ylabel('Recovery Moment X [Nm]')
-    ax1.set_xlim(-1, 21)
+    ax1.set_xlim(*time_axis_limits)
     ax1.set_ylim(-350, 350)
     ax1.legend(loc='upper left', frameon=False)
     ax1.tick_params(direction='in')
@@ -385,7 +413,7 @@ def plot_moment_thesis(log, output_dir=".", time_range=None):
     ax2.plot(time, recovery_moment_y, 'k--', linewidth=1.5, label='Desired')
     ax2.set_xlabel('Time [s]')
     ax2.set_ylabel('Recovery Moment Y [Nm]')
-    ax2.set_xlim(-1, 21)
+    ax2.set_xlim(*time_axis_limits)
     ax2.set_ylim(-350, 350)
     ax2.legend(loc='upper left', frameon=False)
     ax2.tick_params(direction='in')
@@ -401,7 +429,7 @@ def plot_moment_thesis(log, output_dir=".", time_range=None):
     ax3.plot(time, moment_diff_x, 'b-', linewidth=1.5)
     ax3.set_xlabel('Time [s]')
     ax3.set_ylabel('Moment Difference X [Nm]')
-    ax3.set_xlim(-1, 21)
+    ax3.set_xlim(*time_axis_limits)
     ax3.set_ylim(-350, 350)
     ax3.tick_params(direction='in')
     plt.tight_layout()
@@ -416,7 +444,7 @@ def plot_moment_thesis(log, output_dir=".", time_range=None):
     ax4.plot(time, moment_diff_y, 'b-', linewidth=1.5)
     ax4.set_xlabel('Time [s]')
     ax4.set_ylabel('Moment Difference Y [Nm]')
-    ax4.set_xlim(-1, 21)
+    ax4.set_xlim(*time_axis_limits)
     ax4.set_ylim(-350, 350)
     ax4.tick_params(direction='in')
     plt.tight_layout()
@@ -438,17 +466,35 @@ if __name__ == "__main__":
     csv_filename = "control_log.csv"
     output_dir = "."
     time_range = None
-    
-    if len(sys.argv) > 1:
-        csv_filename = sys.argv[1]
-    if len(sys.argv) > 2:
-        output_dir = sys.argv[2]
-    if len(sys.argv) > 4:
+    special_view = False
+
+    args = sys.argv[1:]
+    positional_args = []
+    for arg in args:
+        if arg == SPECIAL_VIEW_FLAG:
+            special_view = True
+        else:
+            positional_args.append(arg)
+
+    if len(positional_args) > 0:
+        csv_filename = positional_args[0]
+    if len(positional_args) > 1:
+        output_dir = positional_args[1]
+    if len(positional_args) > 3:
         # 時間範囲の指定（例: python script.py control_log.csv . 0.0 10.0）
-        t_min = float(sys.argv[3])
-        t_max = float(sys.argv[4])
+        t_min = float(positional_args[2])
+        t_max = float(positional_args[3])
         time_range = (t_min, t_max)
         print(f"📌 時間範囲指定: {t_min} - {t_max} 秒")
+    elif special_view:
+        time_range = SPECIAL_TIME_RANGE
+        print(
+            f"📌 特例表示モード: {SPECIAL_TIME_RANGE[0]} - {SPECIAL_TIME_RANGE[1]} 秒, "
+            f"X={SPECIAL_COM_X_LIMITS[0]} - {SPECIAL_COM_X_LIMITS[1]} m, "
+            f"Y={SPECIAL_COM_Y_LIMITS[0]} - {SPECIAL_COM_Y_LIMITS[1]} m"
+        )
+    else:
+        print("📌 デフォルト表示モード: 従来の表示範囲を使用")
     
     print(f"📂 入力CSVファイル: {csv_filename}")
     print(f"📁 出力ディレクトリ: {output_dir}")
@@ -458,7 +504,12 @@ if __name__ == "__main__":
     
     if log is not None and len(log.get('time', [])) > 0:
         # 全てのグラフを生成
-        plot_com_position_thesis(log, output_dir=output_dir, time_range=time_range)
+        plot_com_position_thesis(
+            log,
+            output_dir=output_dir,
+            time_range=time_range,
+            special_view=special_view,
+        )
         plot_rl_action_thesis(log, output_dir=output_dir, time_range=time_range)
         plot_dcm_offset_thesis(log, output_dir=output_dir, time_range=time_range)
         plot_moment_thesis(log, output_dir=output_dir, time_range=time_range)

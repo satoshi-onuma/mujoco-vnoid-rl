@@ -1,7 +1,7 @@
 <!-- this is original sample_robot_mujoco.xml -->
 
 <mujoco model="sample_robot">
-  <option timestep="0.001"/>
+  <option timestep="0.0001"/>
 
   <visual>
     <map force="0.1" zfar="30"/>
@@ -40,12 +40,12 @@
 
   <default>
     <motor ctrlrange="-100 100" ctrllimited="true"/>
-    <geom condim="3" friction="1" solimp=".9 .99 .003" solref=".01 1" material="body" group="1"/>
+    <geom condim="3" friction="1" solimp=".9 .99 .003" solref=".001 100" material="body" group="1"/>
     <joint type="hinge" damping=".0" stiffness="0" armature=".01" limited="true" solimplimit="0 .99 .01"/>
   </default>
 
   <worldbody>
-   <geom name="floor" size="0 0 .05" type="plane" material="grid" condim="3" conaffinity="1" friction="1" solimp=".9 .99 .003" solref=".001 100"/><!-- <geom name="floor" size="0 0 .05" type="plane" material="grid" condim="3" conaffinity="1" friction="1" solref="0.1 2" solimp=".7 .85 .003" /> -->
+   <geom name="floor" size="0 0 .05" type="plane" material="grid" condim="3" conaffinity="1" friction="1" solref="0.1 2" solimp=".7 .85 .003"/><!-- <geom name="floor" size="0 0 .05" type="plane" material="grid" condim="3" conaffinity="1" friction="1" solref="0.1 2" solimp=".7 .85 .003" /> -->
     <light name="spotlight" mode="targetbodycom" target="HIPS" diffuse=".8 .8 .8" specular="0.3 0.3 0.3" pos="0 -6 4" cutoff="30"/>
     <body name="HIPS" pos="0 0 0.9">
       <freejoint name="root"/>
@@ -171,6 +171,7 @@
                   <joint name="R_FOOT_R" type="hinge" axis="1 0 0" range="-60 60"/>
                   <inertial pos="0 0 0" mass="0.5" diaginertia="0.0003 0.001 0.001"/>
                   <site name="rfsensor"/>
+                  <site name="r_foot_marker" pos="0 0 0" size="0.04" rgba="1 0.2 0.2 0.8" group="1"/>
                 </body>
               </body>
             </body>
@@ -205,6 +206,7 @@
                   <joint name="L_FOOT_R" type="hinge" axis="1 0 0" range="-60 60"/>
                   <inertial pos="0 0 0" mass="0.5" diaginertia="0.0003 0.001 0.001"/>
                   <site name="lfsensor"/>
+                  <site name="l_foot_marker" pos="0 0 0" size="0.04" rgba="0.2 0.4 1.0 0.8" group="1"/>
                 </body>
               </body>
             </body>
@@ -212,7 +214,12 @@
         </body>
       </body>
     </body>
+
   </worldbody>
+
+  <equality>
+    <weld body1="HIPS" />
+  </equality>
 
   <sensor>
     <framepos  objtype="xbody" objname="HIPS"/>

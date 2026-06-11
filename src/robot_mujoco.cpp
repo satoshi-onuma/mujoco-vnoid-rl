@@ -37,6 +37,7 @@ void RobotMujoco::Init(mjModel* _m, mjData* _d, const Param& param, Timer& timer
 	}
 	
 	timer.dt = param.control_cycle*m->opt.timestep;
+	// timer.dt = m->opt.timestep;
 
 }
 

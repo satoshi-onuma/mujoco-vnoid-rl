@@ -212,6 +212,7 @@ public:
 	 *
 	 **/
     void  Countup();
+	void  Stepup();
 
     Timer();
 };

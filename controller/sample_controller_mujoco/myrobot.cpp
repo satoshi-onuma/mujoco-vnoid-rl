@@ -79,8 +79,8 @@ void MyRobot::Init(mjModel* _m, mjData* _d){
     foot.resize(2);
     hand.resize(2);
     // 関節PD一括倍率（全体 a 倍なら3つとも a）。並びは従来どおり1行1関節。
-    constexpr double k_joint_pd_p   = 2.0;
-    constexpr double k_joint_pd_d   = 1.1;
+    constexpr double k_joint_pd_p   = 1.0;
+    constexpr double k_joint_pd_d   = 1.0;
     constexpr double k_joint_ulimit = 1.0;
 
     // 30 joints
@@ -167,29 +167,29 @@ void MyRobot::Control(const RLParams& rl_params){ // ★引数を追加
         // calc FK
         fk_solver.Comp(param, joint, base, centroid, hand, foot);
 
-	    if(timer.count % 10 == 0){
-		    // erase current footsteps
-		    while(footstep.steps.size() > 2)
-			    footstep.steps.pop_back();
+	    // if(timer.count % 10 == 0){
+		//     // erase current footsteps
+		//     while(footstep.steps.size() > 2)
+		// 	    footstep.steps.pop_back();
 
-		    Step step;
-	        step.stride   = 0.1;
-	        step.turn     = 0.0;
-	        step.spacing  = 0.2;
-	        step.climb    = 0.0;
-	        step.duration = 0.4;
-	        footstep.steps.push_back(step);
-	        footstep.steps.push_back(step);
-	        footstep.steps.push_back(step);
-	        footstep.steps.push_back(step);
+		//     Step step;
+	    //     step.stride   = 0.1;
+	    //     step.turn     = 0.0;
+	    //     step.spacing  = 0.2;
+	    //     step.climb    = 0.0;
+	    //     step.duration = 0.4;
+	    //     footstep.steps.push_back(step);
+	    //     footstep.steps.push_back(step);
+	    //     footstep.steps.push_back(step);
+	    //     footstep.steps.push_back(step);
 	
-		    footstep_planner.Plan(param, footstep);
-            footstep_planner.GenerateDCM(param, footstep);
-	    }
+		//     footstep_planner.Plan(param, footstep);
+        //     footstep_planner.GenerateDCM(param, footstep);
+	    // }
 
-        // stepping controller generates swing foot trajectory 
-        // it also performs landing position adaptation
-        stepping_controller.Update(timer, param, footstep, footstep_buffer, centroid, base, foot,rl_params);//rl追加
+        // // stepping controller generates swing foot trajectory 
+        // // it also performs landing position adaptation
+        // stepping_controller.Update(timer, param, footstep, footstep_buffer, centroid, base, foot,rl_params);//rl追加
     
         // stabilizer performs balance feedback
         stabilizer         .Update(timer, param, centroid, base, foot);
