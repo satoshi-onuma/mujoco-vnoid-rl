@@ -26,13 +26,13 @@ print("  - 学習アルゴリズム: PPO")
 print("=" * 70)
 
 
-# Ray初期化
-if not ray.is_initialized():
-    ray.init(
-        address='auto',  # 既存クラスタを検出
-        logging_level="ERROR",
-        #ignore_reinit_error=True
-    )
+# # Ray初期化
+# if not ray.is_initialized():
+#     ray.init(
+#         address='auto',  # 既存クラスタを検出
+#         logging_level="ERROR",
+#         #ignore_reinit_error=True
+#     )
 
 
 # PPO設定

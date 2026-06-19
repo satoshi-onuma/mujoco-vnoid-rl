@@ -10,6 +10,7 @@
 #include <thread>
 #include <fstream>
 #include <random>
+#include <algorithm>
 
 namespace py = pybind11;
 using namespace cnoid::vnoid;
@@ -80,12 +81,21 @@ private:
     int control_cycle_count = 0;
     int terrain_switch_at = -1;
     std::mt19937 terrain_rng{std::random_device{}()};
+    //std::random_device{}()をシードとして入れる
+    //terrain_rngはシードから乱数列を作り続けるオブジェクト
+    //高品質な乱数生成器　メルセンヌ・ツイスタ
+    //１から2^32-1までの整数を生成
+    std::uniform_real_distribution<double> terrain_friction_dist{0.8, 1.0};
+    std::uniform_real_distribution<double> terrain_sr0_dist{0.001, 0.15};
+    std::uniform_real_distribution<double> terrain_sr1_dist{1.0, 150.0};
+    std::uniform_real_distribution<double> terrain_si0_dist{0.6, 0.95};
+    std::uniform_real_distribution<double> terrain_si1_dist{0.80, 0.99};
+    std::uniform_real_distribution<double> terrain_si2_dist{0.001, 0.005};
 
     // MuJoCo 足 body ID（ログ・デバッグ用）
     int bid_r_foot = -1;
     int bid_l_foot = -1;
-    //高品質な乱数生成器　メルセンヌ・ツイスタ
-    //１から2^32-1までの整数を生成
+
 
 public:
     
@@ -347,24 +357,36 @@ public:
 private:
 
     // 地盤パラメータ適用ヘルパー
-    void apply_terrain(double sr0, double sr1,
-                       double si0, double si1, double si2, double si3, double si4) {
+    void apply_terrain(double friction,
+                       double sr0, double sr1,
+                       double si0, double si1, double si2) {
         if (!m) return;
         int fid = mj_name2id(m, mjOBJ_GEOM, "floor");
         if (fid < 0) return;
+        m->geom_friction[fid * 3 + 0] = friction;
         m->geom_solref[fid * 2 + 0] = sr0;
         m->geom_solref[fid * 2 + 1] = sr1;
         m->geom_solimp[fid * 5 + 0] = si0;
         m->geom_solimp[fid * 5 + 1] = si1;
         m->geom_solimp[fid * 5 + 2] = si2;
-        m->geom_solimp[fid * 5 + 3] = si3;
-        m->geom_solimp[fid * 5 + 4] = si4;
-        std::cout << "変わったよ！" << std::endl;
-        std::cout << "今のステップ数：" << control_cycle_count << std::endl;
+        std::cout << "地盤パラメータ変更: friction=" << friction
+                  << " solref=(" << sr0 << ", " << sr1 << ")"
+                  << " solimp=(" << si0 << ", " << si1 << ", " << si2 << ")"
+                  << " step=" << control_cycle_count << std::endl;
     }
-    void apply_hard_terrain() { apply_terrain(0.01, 100.0,  0.9, 0.99, 0.03, 0.5, 2.0); }
-    void apply_soft_terrain() { apply_terrain(0.1,  2.0,  0.7, 0.85, 0.003, 0.5, 2.0); }
-//solimp=".9 .99 .003" solref=".001 100"
+    void apply_hard_terrain() { apply_terrain(1.0, 0.001, 100.0, 0.9, 0.99, 0.003); }
+    void apply_soft_terrain() { apply_terrain(1.0, 0.1, 2.0, 0.7, 0.85, 0.003); }
+    void apply_debug_terrain() { apply_terrain(1.0, 0.2, 1., 0.6, 0.75, 0.003); }
+    void apply_random_terrain() {
+        double friction = terrain_friction_dist(terrain_rng);
+        double sr0 = terrain_sr0_dist(terrain_rng);
+        double sr1 = terrain_sr1_dist(terrain_rng);
+        double si0 = terrain_si0_dist(terrain_rng);
+        double si1 = terrain_si1_dist(terrain_rng);
+        double si2 = terrain_si2_dist(terrain_rng);
+        si0 = std::min(si0, si1 - 0.05);
+        apply_terrain(friction, sr0, sr1, si0, si1, si2);
+    }
 
     void initFootBodyIds() {
         bid_r_foot = mj_name2id(m, mjOBJ_BODY, "R_FOOT_R");
@@ -742,7 +764,11 @@ public:
 
         // 地盤切り替えリセット：硬地盤から開始し、ランダムなサイクルで軟地盤に切り替える
         apply_hard_terrain();
-        std::uniform_int_distribution<int> dist(10000, 50000);
+        std::uniform_int_distribution<int> dist(2000,2800);
+        //One step takes 0.4s when duration = 0.4
+        //Therefore one gait cycle takes 0.8s
+        //So, The step range must cover 0.8/dt = 0.8/0.001 = 800 steps
+        //start from 2s(2/dt=2000)
         //500から2000までの整数を生成する変換器をインスタンス化
         terrain_switch_at = dist(terrain_rng);
         std::cout << "地盤切り替えステップ数：" << terrain_switch_at << std::endl;
@@ -795,9 +821,10 @@ public:
             for (int i = 0; i < this->frame_skip; ++i) {
                 robot->Control(rl_params);
                 control_cycle_count++;
-                // if (control_cycle_count == terrain_switch_at) {
-                //     apply_soft_terrain();
-                // }
+                if (control_cycle_count == terrain_switch_at) {
+                    // apply_random_terrain();
+                    apply_debug_terrain();
+                }
                 mj_step(m, d);
                 
                 if (control_cycle_count % robot->param.control_cycle == 0) {
@@ -835,12 +862,12 @@ public:
             //デバッグ用
             //step_counterが100の倍数のときはstep_completedをtrueにする
             //歩いてないけど擬似的に支持脚が変わったことにする
-            step_counter++;
-            if (step_counter % 100 == 0) {
-                step_completed = true;
-            }else{
-                step_completed = false;
-            }
+            // step_counter++;
+            // if (step_counter % 100 == 0) {
+            //     step_completed = true;
+            // }else{
+            //     step_completed = false;
+            // }
 
 
             if (step_counter  >= MAX_ITERATIONS) {
@@ -900,9 +927,9 @@ public:
         try {
 
             // // カメラをロボットに追従させる、必要ないときは消せ
-            // cam.lookat[0] = d->qpos[0];  // X座標
-            // cam.lookat[1] = d->qpos[1];  // Y座標
-            // cam.lookat[2] = d->qpos[2];  // Z座標
+            cam.lookat[0] = d->qpos[0];  // X座標
+            cam.lookat[1] = d->qpos[1];  // Y座標
+            cam.lookat[2] = d->qpos[2];  // Z座標
 
 
             // 録画用の固定ビューポート

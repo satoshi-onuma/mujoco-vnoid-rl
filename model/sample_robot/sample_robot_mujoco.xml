@@ -1,7 +1,7 @@
 <!-- this is original sample_robot_mujoco.xml -->
 
 <mujoco model="sample_robot">
-  <option timestep="0.0001"/>
+  <option timestep="0.001"/>
 
   <visual>
     <map force="0.1" zfar="30"/>
@@ -41,7 +41,7 @@
   <default>
     <motor ctrlrange="-100 100" ctrllimited="true"/>
     <geom condim="3" friction="1" solimp=".9 .99 .003" solref=".001 100" material="body" group="1"/>
-    <joint type="hinge" damping=".0" stiffness="0" armature=".01" limited="true" solimplimit="0 .99 .01"/>
+    <joint type="hinge" damping=".0" stiffness="0" armature="1.0" limited="true" solimplimit="0 .99 .01"/>
   </default>
 
   <worldbody>
@@ -217,9 +217,9 @@
 
   </worldbody>
 
-  <equality>
+  <!-- <equality>
     <weld body1="HIPS" />
-  </equality>
+  </equality> -->
 
   <sensor>
     <framepos  objtype="xbody" objname="HIPS"/>

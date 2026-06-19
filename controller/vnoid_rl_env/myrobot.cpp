@@ -13,7 +13,7 @@ MyRobot::MyRobot(){
 void MyRobot::Init(mjModel* _m, mjData* _d){
     // init params
     //  control parameters
-    param.control_cycle = 10;
+    param.control_cycle = 1;
 
     //  dynamical parameters
 	param.total_mass = 50.0;
@@ -82,7 +82,7 @@ void MyRobot::Init(mjModel* _m, mjData* _d){
 
     // 関節PD一括倍率（全体 a 倍なら3つとも a）。並びは従来どおり1行1関節。
     constexpr double k_joint_pd_p   = 1.0;
-    constexpr double k_joint_pd_d   = 0.1;
+    constexpr double k_joint_pd_d   = 1.0;
     constexpr double k_joint_ulimit = 1.0;
 
     // 30 joints
@@ -167,28 +167,30 @@ void MyRobot::Control(const RLParams& rl_params){ // ★引数を追加
         // calc FK
         fk_solver.Comp(param, joint, base, centroid, hand, foot);
 
-        //     if(timer.count % (10*param.control_cycle) == 0){//ここも10制御周期に一回ならcontrol_cycleする必要がある
-        //         // erase current footsteps
-        //         while(footstep.steps.size() > 2)
-        //             footstep.steps.pop_back();
+            if(timer.count % (10*param.control_cycle) == 0){//ここも10制御周期に一回ならcontrol_cycleする必要がある
+                // erase current footsteps
+                while(footstep.steps.size() > 2)
+                    footstep.steps.pop_back();
 
-        //         Step step;
-        //         step.stride   = 0.1  ;
-        //         step.turn     = 0.0 ;
-        //         step.spacing  = 0.2  ;
-        //         step.climb    = 0.0  ;
-        //         step.duration = 0.4 ;
-        //         footstep.steps.push_back(step);
-        //         footstep.steps.push_back(step);
-        //         footstep.steps.push_back(step);
-        //         footstep.steps.push_back(step);
+                Step step;
+                step.stride   = 0.1  ;
+                step.turn     = 0.0 ;
+                step.spacing  = 0.2  ;
+                step.climb    = 0.0  ;
+                step.duration = 0.4 ;
+                footstep.steps.push_back(step);
+                footstep.steps.push_back(step);
+                footstep.steps.push_back(step);
+                footstep.steps.push_back(step);
         
-        //         footstep_planner.Plan(param, footstep);
-        //         footstep_planner.GenerateDCM(param, footstep);
-        //     }
+                footstep_planner.Plan(param, footstep);
+                footstep_planner.GenerateDCM(param, footstep);
+            }
 
-        // stepping_controller.Update(timer, param, footstep, footstep_buffer,centroid, base, foot,rl_params);
-        // stabilizer performs balance feedback
+        stepping_controller.Update(timer, param, footstep, footstep_buffer,centroid, base, foot,rl_params);
+        //if you want to stop the robot, you need to stop the stepping_controller.
+        //Also,you need to change the Step() in the bindings.cpp
+        //stabilizer performs balance feedback 
         stabilizer         .Update(timer, param, centroid, base, foot);
     
         hand[0].pos_ref = centroid.com_pos_ref + base.ori_ref*Vector3(0.0, -0.25, -0.1);
