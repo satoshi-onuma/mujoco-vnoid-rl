@@ -1,17 +1,39 @@
-# ビルド関連のフォルダやファイル
+# ビルド関連
 build/
 dist/
 *.o
 *.exe
 *.log
+__pycache__/
+*.pyc
 
-# 動画ファイル
+# 動画
 *.mp4
 *.mov
 *.avi
 
-# 大きなログファイル（特定のディレクトリのみ）
-RL_2/
-Baseline_2/
-even_tyrrain_2/
-**/control_log.csv
+# 実験生成物（ログ・チェックポイント・図）
+*.csv
+*.pkl
+*.pt
+*.zip
+control_analysis*.pdf
+control_analysis*.png
+joint_angles_*.pdf
+joint_angles_*.png
+moment_error_analysis.pdf
+reward_log_analysis.*
+training_stats_*.csv
+training_stats_*.pdf
+training_stats_*.png
+training_curve.png
+humanoid_vnoid_training_curve.png
+slip_vanilla.png
+MUJOCO_LOG.TXT
+Untitled
+.~lock.*#
+
+# チェックポイント・実験出力先
+humanoid_vnoid_checkpoint*/
+runs/
+experiments/
