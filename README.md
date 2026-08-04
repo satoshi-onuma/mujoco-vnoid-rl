@@ -77,3 +77,23 @@ Install [mujoco](https://github.com/google-deepmind/mujoco).
   Adding ".../vnoid" to the installation path is recommended to avoid having installed files mixed with other stuff.
   Configure, generate, build, and install.
 - Run the executable in the bin directory of the install path.
+
+## RL experiment manager (tkinter)
+
+強化学習の実験投入・進捗監視・結果比較用のデスクトップGUIです。
+詳細は [rl_experiment_app/README.md](rl_experiment_app/README.md) を参照。
+
+```bash
+micromamba activate robot_env
+
+# C++ 環境モジュールのビルド（build ディレクトリ内で）
+cd build
+cmake ..   -DVNOID_BUILD_MUJOCO=ON   -DVNOID_BUILD_CNOID=OFF   -DCMAKE_INSTALL_PREFIX=~/vnoid-mujoco-install   -DCMAKE_PREFIX_PATH=~/mujoco-install
+make -j8
+cd ..
+
+# GUI 起動
+python -m rl_experiment_app.main
+```
+
+実験データは `~/vnoid-experiments/runs/` に保存されます。

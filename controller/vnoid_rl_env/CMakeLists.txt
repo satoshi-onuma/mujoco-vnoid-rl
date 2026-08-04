@@ -12,7 +12,16 @@ find_package(glfw3 REQUIRED)
 find_package(Python3 COMPONENTS Interpreter Development REQUIRED)
 
 # Pythonがインポートできるモジュールとしてライブラリをビルド
-add_library(vnoid_rl_env MODULE bindings.cpp myrobot.cpp)
+add_library(vnoid_rl_env MODULE
+    bindings.cpp
+    myrobot.cpp
+    vnoid_env_lifecycle.cpp
+    vnoid_env_reward.cpp
+    vnoid_env_episode.cpp
+    vnoid_env_terrain.cpp
+    vnoid_env_logging.cpp
+    vnoid_env_render.cpp
+)
 set_target_properties(vnoid_rl_env PROPERTIES PREFIX "")
 
 # C++の規格を指定

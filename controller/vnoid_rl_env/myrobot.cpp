@@ -10,6 +10,45 @@ MyRobot::MyRobot(){
     base_actuation = false;
 }
 
+void MyRobot::SetFixedWalkCommand(){
+    walk_cmd.stride   = 0.1;
+    walk_cmd.sway     = 0.0;
+    walk_cmd.turn     = 0.0;
+    walk_cmd.spacing  = 0.2;
+    walk_cmd.climb    = 0.0;
+    walk_cmd.duration = 0.4;
+}
+
+void MyRobot::SetWalkCommand(double stride, double sway, double turn){
+    walk_cmd.stride = stride;
+    walk_cmd.sway   = sway;
+    walk_cmd.turn   = turn;
+}
+
+void MyRobot::UpdateFootstepPlan(){
+    // erase current footsteps
+    while(footstep.steps.size() > 2){
+        footstep.steps.pop_back();
+    }
+
+    Step step;
+    step.stride   = walk_cmd.stride;
+    step.sway     = walk_cmd.sway;
+    step.turn     = walk_cmd.turn;
+    step.spacing  = walk_cmd.spacing;
+    step.climb    = walk_cmd.climb;
+    step.duration = walk_cmd.duration;
+
+    // 先読み分を積む（現状の運用に合わせて4歩ぶん）
+    footstep.steps.push_back(step);
+    footstep.steps.push_back(step);
+    footstep.steps.push_back(step);
+    footstep.steps.push_back(step);
+
+    footstep_planner.Plan(param, footstep);
+    footstep_planner.GenerateDCM(param, footstep);
+}
+
 void MyRobot::Init(mjModel* _m, mjData* _d){
     // init params
     //  control parameters
@@ -158,6 +197,9 @@ void MyRobot::Init(mjModel* _m, mjData* _d){
     stabilizer.orientation_ctrl_gain_p = 100.0;
     stabilizer.orientation_ctrl_gain_d = 10.0;
     stabilizer.dcm_ctrl_gain           = 2.0;
+
+    // default walk command (can be overridden externally)
+    SetFixedWalkCommand();
     
 }
 void MyRobot::Control(const RLParams& rl_params){ // ★引数を追加
@@ -167,27 +209,12 @@ void MyRobot::Control(const RLParams& rl_params){ // ★引数を追加
         // calc FK
         fk_solver.Comp(param, joint, base, centroid, hand, foot);
 
-            if(timer.count % (10*param.control_cycle) == 0){//ここも10制御周期に一回ならcontrol_cycleする必要がある
-                // erase current footsteps
-                while(footstep.steps.size() > 2)
-                    footstep.steps.pop_back();
-
-                Step step;
-                step.stride   = 0.1  ;
-                step.turn     = 0.0 ;
-                step.spacing  = 0.2  ;
-                step.climb    = 0.0  ;
-                step.duration = 0.4 ;
-                footstep.steps.push_back(step);
-                footstep.steps.push_back(step);
-                footstep.steps.push_back(step);
-                footstep.steps.push_back(step);
-        
-                footstep_planner.Plan(param, footstep);
-                footstep_planner.GenerateDCM(param, footstep);
-            }
+        if(timer.count % (10*param.control_cycle) == 0){//ここも10制御周期に一回ならcontrol_cycleする必要がある
+            UpdateFootstepPlan();
+        }
 
         stepping_controller.Update(timer, param, footstep, footstep_buffer,centroid, base, foot,rl_params);
+        
         //if you want to stop the robot, you need to stop the stepping_controller.
         //Also,you need to change the Step() in the bindings.cpp
         //stabilizer performs balance feedback 

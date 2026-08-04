@@ -38,11 +38,21 @@ public:
     FkSolver            fk_solver;
     IkSolver            ik_solver;
 
+    // 歩容コマンド（唯一の真実源）
+    WalkCommand walk_cmd;
+
 public:
 	
 	virtual void Init(mjModel* _m, mjData* _d);
 	virtual void Control(const RLParams& rl_params); // ★引数を追加
     void ResetState(); 
+
+    // コマンド設定（デバッグしやすいよう用途別に分離）
+    void SetFixedWalkCommand();
+    void SetWalkCommand(double stride, double sway, double turn);
+
+    // 現在の walk_cmd で footstep を再計画
+    void UpdateFootstepPlan();
 	
 	MyRobot();
 

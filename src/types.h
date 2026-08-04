@@ -18,3 +18,15 @@
  struct RLParams {
     Vector3 foot_offset = Vector3(0.0, 0.0, 0.0);
  };
+
+// 歩容（コマンド）: 1歩あたりの変位/旋回量を基本単位として持つ
+// - stride/sway/turn は joystick の指令と同型
+// - spacing/climb/duration は footstep 生成でそのまま使用
+struct WalkCommand {
+   double stride   = 0.0;
+   double sway     = 0.0;
+   double turn     = 0.0;
+   double spacing  = 0.2;
+   double climb    = 0.0;
+   double duration = 0.4;
+};

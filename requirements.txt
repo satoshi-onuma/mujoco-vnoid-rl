@@ -1,0 +1,8 @@
+ray[rllib]
+torch
+gymnasium
+matplotlib
+imageio
+imageio-ffmpeg
+numpy
+pandas

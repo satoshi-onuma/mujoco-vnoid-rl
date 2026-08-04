@@ -187,8 +187,12 @@ void MyRobot::Control(){
 			footstep.steps.pop_back();
 
 		Step step;
-		step.stride   = 0.1; //-max_stride*joystick.getPosition(Joystick::L_STICK_V_AXIS);
-		step.turn     = 0.0; //-max_turn  *joystick.getPosition(Joystick::L_STICK_H_AXIS);
+		step.stride   = 0.1; 
+		step.turn     = 0.0; 
+        // step.stride   = - max_stride * joystick.getPosition(Joystick::L_STICK_V_AXIS);
+        // step.sway     = - max_sway   * joystick.getPosition(Joystick::L_STICK_H_AXIS);
+        // step.turn     = - max_turn   * (joystick.getButtonState(Joystick::R_BUTTON) - joystick.getButtonState(Joystick::L_BUTTON));
+    
 		step.spacing  = 0.20;
 		step.climb    = 0.0;
 		step.duration = 0.5;

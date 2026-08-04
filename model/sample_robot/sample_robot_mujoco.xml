@@ -1,7 +1,7 @@
 <!-- this is original sample_robot_mujoco.xml -->
 
 <mujoco model="sample_robot">
-  <option timestep="0.001"/>
+  <option timestep="0.01"/>
 
   <visual>
     <map force="0.1" zfar="30"/>

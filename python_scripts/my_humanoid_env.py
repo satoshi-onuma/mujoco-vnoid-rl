@@ -36,7 +36,8 @@ class HumanoidVnoidEnv(gym.Env):
         "render_fps": 60,  # sample_controller_mujocoと同じ
     }
 
-    def __init__(self, enable_rendering=False, render_mode=None, max_episode_steps=50, **kwargs):
+    def __init__(self, enable_rendering=False, render_mode=None, max_episode_steps=50,
+                 reward_weights=None, terrain_config=None, **kwargs):
         super().__init__()
         
         # render_modeが指定されている場合は自動的にレンダリング有効化
@@ -60,10 +61,28 @@ class HumanoidVnoidEnv(gym.Env):
         self.max_episode_steps = max_episode_steps
         self._step_count = 0
 
+        # ★ 実験管理アプリ対応: 報酬重み・切り替え先地盤の設定をC++側に渡す
+        # 地盤は「渡すだけ」。resetで硬地盤から始めて歩行途中で切り替えるのはC++側の役割
+        if reward_weights is not None:
+            self.cpp_env.set_reward_weights(
+                float(reward_weights.get("w_track", 1.0)),
+                float(reward_weights.get("w_act", 0.1)),
+                float(reward_weights.get("w_healthy", 1.0)),
+                float(reward_weights.get("tracking_sigma", 0.02)),
+            )
+        if terrain_config:
+            self.cpp_env.set_terrain_config(dict(terrain_config))
+
         
         # 行動空間と観測空間の設定
         self.action_space = gym.spaces.Box(low=-1.0, high=1.0, shape=(2,), dtype=np.float32)
-        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(16,), dtype=np.float64)
+        # obs末尾に command(stride,sway,turn) を追加したので +3
+        self.observation_space = gym.spaces.Box(low=-np.inf, high=np.inf, shape=(19,), dtype=np.float64)
+
+        # Phase3: command sampling ranges（1歩あたり変位/旋回量）
+        self.command_stride_range = (-0.10, 0.10)
+        self.command_sway_range = (-0.04, 0.04)
+        self.command_turn_range = (-0.20, 0.20)
         
         mode_str = "録画モード(OpenGL有効)" if enable_rendering else "学習モード(OpenGL無効)"
         print(f"✅ HumanoidVnoidEnv初期化完了: {mode_str}")
@@ -81,8 +100,8 @@ class HumanoidVnoidEnv(gym.Env):
         """
         # actionをスケーリング
          rl_action = np.zeros(2, dtype=np.float64)
-         rl_action[0] = action[0] * 0.15   
-         rl_action[1] = action[1] * 0.1  
+         rl_action[0] = action[0] * 0.15   #[-0.15 0.15]
+         rl_action[1] = action[1] * 0.1   #[-0.1 0.1]
          #rl_action[2] = action[2] * 0.15 
          #rl_action[3] = action[3] * 0.1
          #rl_action[4] = action[4] * 0.2  
@@ -122,6 +141,18 @@ class HumanoidVnoidEnv(gym.Env):
         super().reset(seed=seed)
         self._step_count = 0  # リセット時にカウンタをゼロに
         obs = self.cpp_env.reset()
+
+        # Phase3: エピソードごとに歩容コマンドをリサンプルしてC++へ注入
+        # gymnasium の RNG（self.np_random）を使う
+        #RNGとか他のところで使ったっけ
+        # stride = float(self.np_random.uniform(*self.command_stride_range))
+        # sway = float(self.np_random.uniform(*self.command_sway_range))
+        # turn = float(self.np_random.uniform(*self.command_turn_range))
+        # self.cpp_env.set_walk_command(stride, sway, turn)
+
+        # command反映後の観測を取得（obs末尾にcommandが入る）
+        # これはなんでこんな書き方してんの？
+        obs = self.cpp_env.get_observation() if hasattr(self.cpp_env, "get_observation") else obs
         self._prev_step_completed = False
         info = {}
         #_get_obs()と_get_info()作ってもいいかも
@@ -143,5 +174,7 @@ class HumanoidVnoidEnv(gym.Env):
 tune.register_env("HumanoidVnoid-v0", 
                   lambda config: HumanoidVnoidEnv(
                       enable_rendering=config.get("enable_rendering", False),
-                      render_mode=config.get("render_mode", None)
+                      render_mode=config.get("render_mode", None),
+                      reward_weights=config.get("reward_weights", None),
+                      terrain_config=config.get("terrain_config", None)
                   ))
