@@ -18,8 +18,8 @@ void VnoidEnv::apply_terrain(double friction,
               << " step=" << control_cycle_count << std::endl;
 }
 
-void VnoidEnv::apply_hard_terrain() { apply_terrain(1.0, 0.001, 100.0, 0.9, 0.99, 0.003); }
-void VnoidEnv::apply_soft_terrain() { apply_terrain(1.0, 0.1, 2.0, 0.7, 0.85, 0.003); }
+void VnoidEnv::apply_hard_terrain() { apply_terrain(1.0, 0.02, 100.0, 0.9, 0.99, 0.003); }
+void VnoidEnv::apply_soft_terrain() { apply_terrain(1.0, 0.15, 1., 0.65, 0.75, 0.003); }
 void VnoidEnv::apply_debug_terrain() { apply_terrain(1.0, 0.2, 1., 0.6, 0.75, 0.003); }
 
 void VnoidEnv::apply_random_terrain() {
@@ -72,6 +72,7 @@ void VnoidEnv::apply_switch_terrain() {
                   << " (hard/soft/debug/random) → softを使用" << std::endl;
         apply_soft_terrain();
     }
+    
 }
 
 // std::uniform_real_distribution<double> terrain_friction_dist{0.8, 1.0};

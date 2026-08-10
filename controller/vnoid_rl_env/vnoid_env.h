@@ -70,6 +70,10 @@ private:
     std::ofstream reward_csv_file;
     bool reward_csv_opened = false;
     int reward_step_index = 0;
+    // reward_tracking() が計算した中間量をログ用に退避（報酬式自体には使わない）
+    double last_dx = 0.0, last_dy = 0.0;
+    double last_ex_disp = 0.0, last_ey_disp = 0.0;
+    double last_ex = 0.0, last_ey = 0.0;
 #endif
 
     // RLアクション保存用
@@ -93,26 +97,27 @@ private:
     //高品質な乱数生成器　メルセンヌ・ツイスタ
     //１から2^32-1までの整数を生成
     std::uniform_real_distribution<double> terrain_friction_dist{0.8, 1.0};
-    std::uniform_real_distribution<double> terrain_sr0_dist{0.001, 0.15};
-    std::uniform_real_distribution<double> terrain_sr1_dist{1.0, 150.0};
+    std::uniform_real_distribution<double> terrain_sr0_dist{0.02, 0.2};
+    std::uniform_real_distribution<double> terrain_sr1_dist{0.9, 110.0};
     std::uniform_real_distribution<double> terrain_si0_dist{0.6, 0.95};
-    std::uniform_real_distribution<double> terrain_si1_dist{0.80, 0.99};
-    std::uniform_real_distribution<double> terrain_si2_dist{0.001, 0.005};
+    std::uniform_real_distribution<double> terrain_si1_dist{0.70, 0.99};
+    std::uniform_real_distribution<double> terrain_si2_dist{0.002, 0.004};
 
     // MuJoCo 足 body ID（ログ・デバッグ用）
     int bid_r_foot = -1;
     int bid_l_foot = -1;
 
     // reward params (1歩スケール)
-    double w_track = 1.0;
+    double w_track = 0.0;
     double tracking_sigma = 0.02; // 1歩変位誤差のスケール
     double w_act = 0.1;          // まずは0から導入（弱いペナルティ）
     double w_healthy = 1.0;
 
     // 歩行途中の切り替え先地盤（Pythonから注入。切り替えタイミングはC++側が決める）
-    std::string terrain_switch_mode = "soft";
+    std::string terrain_switch_mode = "debug";
     bool terrain_params_given = false;
     // friction, solref0, solref1, solimp0, solimp1, solimp2
+    // 数値6個を直接渡されたとき用の退避先
     double terrain_params[6] = {1.0, 0.1, 2.0, 0.7, 0.85, 0.003};
 
 private:
@@ -121,9 +126,8 @@ private:
     double reward_healthy();
 
 #if VNOID_REWARD_LOG_DEBUG
-    void log_reward_step(double dx, double dy, double ex_disp, double ey_disp,
-                         double ex, double ey, double tracking,
-                         double action_penalty, double healthy, double total);
+    void log_reward_step(double tracking, double action_penalty,
+                         double healthy, double total);
 #endif
 
 public:

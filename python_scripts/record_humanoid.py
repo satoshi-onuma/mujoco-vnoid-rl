@@ -28,6 +28,13 @@ parser.add_argument("--checkpoint-dir", type=str, default="./humanoid_vnoid_chec
 parser.add_argument("--run-dir", type=str, default=None, help="出力先。未指定時はCWDに従来のファイル名で出力")
 parser.add_argument("--terrain", type=str, default=None, choices=["hard", "soft", "debug", "random"],
                     help="歩行途中で切り替わる先の地盤（開始時は常に硬地盤）")
+# 指定した項目だけ C++ の terrain_params に渡す（1つでも指定すると mode より優先）
+parser.add_argument("--friction", type=float, default=None)
+parser.add_argument("--solref0", type=float, default=None)
+parser.add_argument("--solref1", type=float, default=None)
+parser.add_argument("--solimp0", type=float, default=None)
+parser.add_argument("--solimp1", type=float, default=None)
+parser.add_argument("--solimp2", type=float, default=None)
 parser.add_argument("--total-steps", type=int, default=500)
 parser.add_argument("--output-fps", type=int, default=30)
 parser.add_argument("--no-rl-policy", action="store_true", help="学習済み方策を使わずゼロアクションで実行")
@@ -96,7 +103,16 @@ except Exception as e:
 
 # 録画用環境を作成（OpenGL有効）
 print("\n🎬 録画環境を作成中...")
-terrain_config = {"mode": args.terrain} if args.terrain else None
+terrain_config = {}
+if args.terrain:
+    terrain_config["mode"] = args.terrain
+for key in ("friction", "solref0", "solref1", "solimp0", "solimp1", "solimp2"):
+    val = getattr(args, key)
+    if val is not None:
+        terrain_config[key] = val
+if not terrain_config:
+    terrain_config = None
+print(f"  - terrain_config: {terrain_config}")
 env = HumanoidVnoidEnv(enable_rendering=True, render_mode="rgb_array", terrain_config=terrain_config)
 obs, info = env.reset(seed=42)
 print("✅ 録画環境作成完了")

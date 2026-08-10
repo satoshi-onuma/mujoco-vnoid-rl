@@ -45,12 +45,12 @@ py::array_t<double> VnoidEnv::reset() {
 
     // 地盤切り替えリセット：硬地盤から開始し、ランダムなサイクルで軟地盤に切り替える
     apply_hard_terrain();
-    std::uniform_int_distribution<int> dist(400,560);
+    std::uniform_int_distribution<int> dist(200,280);
     //One step takes 0.4s when duration = 0.4
     //Therefore one gait cycle takes 0.8s
-    //So, The step range must cover 0.8/dt = 0.8/0.001 = 800 steps
-    //start from 2s(2/dt=2000)
-    //500から2000までの整数を生成する変換器をインスタンス化
+    //So, The step range must cover 0.8/dt = 0.8/0.01 = 80 steps
+    //start from 2s(2/dt=200)
+    //200から280までの整数を生成する変換器をインスタンス化
     terrain_switch_at = dist(terrain_rng);
     std::cout << "地盤切り替えステップ数：" << terrain_switch_at << std::endl;
     //生成した乱数をシードとして入れる

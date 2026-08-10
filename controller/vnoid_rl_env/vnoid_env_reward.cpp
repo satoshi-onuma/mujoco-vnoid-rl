@@ -23,6 +23,12 @@ double VnoidEnv::reward_tracking() {
     const double ey_disp = s*dx + c*dy;
     const double ex = robot->walk_cmd.stride - ex_disp;
     const double ey = robot->walk_cmd.sway   - ey_disp;
+#if VNOID_REWARD_LOG_DEBUG
+    // ログ用に中間量を退避（報酬式には影響しない）
+    last_dx = dx; last_dy = dy;
+    last_ex_disp = ex_disp; last_ey_disp = ey_disp;
+    last_ex = ex; last_ey = ey;
+#endif
     return std::exp(-(ex*ex + ey*ey) / tracking_sigma);
 }
 
@@ -39,17 +45,16 @@ double VnoidEnv::reward_healthy() {
 }
 
 #if VNOID_REWARD_LOG_DEBUG
-void VnoidEnv::log_reward_step(double dx, double dy, double ex_disp, double ey_disp,
-                     double ex, double ey, double tracking,
-                     double action_penalty, double healthy, double total) {
+void VnoidEnv::log_reward_step(double tracking, double action_penalty,
+                     double healthy, double total) {
     if (!reward_csv_opened) return;
     const double time = robot ? robot->timer.time : 0.0;
     reward_csv_file
         << reward_step_index << ","
         << time << ","
-        << dx << "," << dy << ","
-        << ex_disp << "," << ey_disp << ","
-        << ex << "," << ey << ","
+        << last_dx << "," << last_dy << ","
+        << last_ex_disp << "," << last_ey_disp << ","
+        << last_ex << "," << last_ey << ","
         << tracking << "," << action_penalty << "," << healthy << "," << total << ","
         << robot->walk_cmd.stride << "," << robot->walk_cmd.sway << "," << robot->walk_cmd.turn << ","
         << step_start_yaw << "," << robot->base.angle.z() << ","
@@ -111,30 +116,17 @@ double VnoidEnv::compute_reward() {
         return 0.0;
     }
 
-    double r;
-#if VNOID_REWARD_LOG_DEBUG
-    const double dx = d->qpos[0] - previous_x;
-    const double dy = d->qpos[1] - previous_y;
-    const double c = std::cos(-step_start_yaw);
-    const double s = std::sin(-step_start_yaw);
-    const double ex_disp = c*dx - s*dy;
-    const double ey_disp = s*dx + c*dy;
-    const double ex = robot->walk_cmd.stride - ex_disp;
-    const double ey = robot->walk_cmd.sway   - ey_disp;
-    const double tracking = std::exp(-(ex*ex + ey*ey) / tracking_sigma);
+    // 報酬式はここにしか存在しない。デバッグログの有無で式が変わることはない。
+    const double tracking = reward_tracking();
     const double action_penalty = reward_action_penalty();
     const double healthy = reward_healthy();
-    r =
-        // w_track   * tracking
-       w_healthy * healthy
-      - w_act     * action_penalty;
-    log_reward_step(dx, dy, ex_disp, ey_disp, ex, ey, tracking,
-                    action_penalty, healthy, r);
-#else
-    r =
-        w_track   * reward_tracking()
-      + w_healthy * reward_healthy()
-      - w_act     * reward_action_penalty();
+
+    const double r = w_track   * tracking
+                    + w_healthy * healthy
+                    - w_act     * action_penalty;
+
+#if VNOID_REWARD_LOG_DEBUG
+    log_reward_step(tracking, action_penalty, healthy, r);
 #endif
 
     // 次回のために現在の位置と次歩用の基準yawを保存
