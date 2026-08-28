@@ -44,7 +44,7 @@ class RunTab(ttk.Frame):
         hp_frame.pack(fill="x", padx=8, pady=4)
 
         # 開始時は常に硬地盤。ここで選ぶのは歩行途中で切り替わる先の地盤
-        ttk.Label(hp_frame, text="切替先地盤").grid(row=0, column=0, sticky="w", padx=4, pady=2)
+        ttk.Label(hp_frame, text="切替先地盤 (random=softness[0,1.1])").grid(row=0, column=0, sticky="w", padx=4, pady=2)
         self.terrain_var = tk.StringVar(value="soft")
         ttk.Combobox(
             hp_frame, textvariable=self.terrain_var,

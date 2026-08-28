@@ -28,6 +28,8 @@ parser.add_argument("--checkpoint-dir", type=str, default="./humanoid_vnoid_chec
 parser.add_argument("--run-dir", type=str, default=None, help="出力先。未指定時はCWDに従来のファイル名で出力")
 parser.add_argument("--terrain", type=str, default=None, choices=["hard", "soft", "debug", "random"],
                     help="歩行途中で切り替わる先の地盤（開始時は常に硬地盤）")
+parser.add_argument("--terrain-softness", type=float, default=None,
+                    help="切替先地盤の柔らかさスカラー。C++側で hard=0 / soft=1 を補間する")
 # 指定した項目だけ C++ の terrain_params に渡す（1つでも指定すると mode より優先）
 parser.add_argument("--friction", type=float, default=None)
 parser.add_argument("--solref0", type=float, default=None)
@@ -54,7 +56,11 @@ print(f"  - 出力FPS: {OUTPUT_FPS}")
 print("  - 並列環境数: なし（単一環境）")
 print("  - OpenGL: 有効（録画のため）")
 print("  - 推論モード: 学習済みポリシー使用")
-print(f"  - 切り替え先地盤: {args.terrain or '(C++側デフォルト: soft)'}")
+if args.terrain_softness is not None:
+    terrain_label = f"softness_{args.terrain_softness:.2f}"
+else:
+    terrain_label = args.terrain or "(C++側デフォルト: soft)"
+print(f"  - 切り替え先地盤: {terrain_label}")
 print("=" * 70)
 
 # チェックポイント確認
@@ -70,7 +76,10 @@ if not os.path.exists(checkpoint_dir):
 if args.run_dir:
     run_dir = Path(args.run_dir).expanduser().resolve()
     run_dir.mkdir(parents=True, exist_ok=True)
-    prefix = f"{args.terrain}_" if args.terrain else ""
+    if args.terrain_softness is not None:
+        prefix = f"softness_{args.terrain_softness:.2f}_"
+    else:
+        prefix = f"{args.terrain}_" if args.terrain else ""
     output_path = str(run_dir / f"{prefix}demo.mp4")
     csv_output_path = str(run_dir / f"{prefix}recording_log.csv")
 else:
@@ -104,7 +113,10 @@ except Exception as e:
 # 録画用環境を作成（OpenGL有効）
 print("\n🎬 録画環境を作成中...")
 terrain_config = {}
-if args.terrain:
+if args.terrain_softness is not None:
+    terrain_config["mode"] = "terrain_softness"
+    terrain_config["terrain_softness"] = args.terrain_softness
+elif args.terrain:
     terrain_config["mode"] = args.terrain
 for key in ("friction", "solref0", "solref1", "solimp0", "solimp1", "solimp2"):
     val = getattr(args, key)
@@ -245,7 +257,10 @@ if control_log_src.exists():
         if xs:
             walk_distance = math.sqrt((xs[-1] - xs[0]) ** 2 + (ys[-1] - ys[0]) ** 2)
         if args.run_dir:
-            prefix = f"{args.terrain}_" if args.terrain else ""
+            if args.terrain_softness is not None:
+                prefix = f"softness_{args.terrain_softness:.2f}_"
+            else:
+                prefix = f"{args.terrain}_" if args.terrain else ""
             import shutil
             shutil.move(str(control_log_src), str(run_dir / f"{prefix}control_log.csv"))
     except Exception as e:
@@ -253,7 +268,11 @@ if control_log_src.exists():
 
 # eval_launcher が標準出力からJSONを読む
 print("EVAL_RESULT_JSON:" + json.dumps({
-    "terrain_mode": args.terrain or "default",
+    "terrain_mode": (
+        f"softness_{args.terrain_softness:.2f}"
+        if args.terrain_softness is not None
+        else (args.terrain or "default")
+    ),
     "walk_distance": walk_distance,
     "video_path": str(output_path),
     "log_csv_path": str(csv_output_path),

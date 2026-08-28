@@ -26,7 +26,7 @@ parser.add_argument("--w-act", type=float, default=0.1)
 parser.add_argument("--w-healthy", type=float, default=1.0)
 parser.add_argument("--tracking-sigma", type=float, default=0.02)
 parser.add_argument("--terrain", type=str, default="soft", choices=["hard", "soft", "debug", "random"],
-                    help="歩行途中で切り替わる先の地盤（開始時は常に硬地盤）")
+                    help="歩行途中で切り替わる先の地盤（開始時は常に硬地盤）。random は terrain_softness ∈ [0, 1.1] の1次元補間")
 parser.add_argument("--lr", type=float, default=1e-4)
 parser.add_argument("--gamma", type=float, default=0.99)
 parser.add_argument("--num-workers", type=int, default=8)
@@ -41,7 +41,7 @@ args = parser.parse_args()
 # NUM_GPUS = 1
 NUM_WORKERS = args.num_workers   # 並列環境数
 NUM_GPUS = args.num_gpus
-ROLLOUT_FRAGMENT_LENGTH = 50
+ROLLOUT_FRAGMENT_LENGTH = 250
 
 # ★ 出力先: ~/vnoid-experiments/runs/<run_id>/ に統一
 run_id = args.run_id or f"adhoc_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
@@ -100,7 +100,7 @@ config = (
         lambda_=0.95,
         clip_param=0.2,
         entropy_coeff=0.0,
-        num_sgd_iter=20,  # ★ num_sgd_iterから変更
+        num_sgd_iter=10,  # ★ num_sgd_iterから変更
     )
     .resources(
         num_gpus=NUM_GPUS,  # ★ TITAN V を活用

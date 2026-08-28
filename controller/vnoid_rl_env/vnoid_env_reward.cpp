@@ -37,6 +37,7 @@ double VnoidEnv::reward_action_penalty() {
     const double a1 = last_rl_action[1] / 0.1; //[-0.1 0.1]→[-1 1]
     return a0*a0 + a1*a1;  //[0 2]
             //現状あまりにも介入に対するペナルティが低すぎる
+        
 
 }
 

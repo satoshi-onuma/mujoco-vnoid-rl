@@ -96,12 +96,15 @@ private:
     //terrain_rngはシードから乱数列を作り続けるオブジェクト
     //高品質な乱数生成器　メルセンヌ・ツイスタ
     //１から2^32-1までの整数を生成
-    std::uniform_real_distribution<double> terrain_friction_dist{0.8, 1.0};
-    std::uniform_real_distribution<double> terrain_sr0_dist{0.02, 0.2};
-    std::uniform_real_distribution<double> terrain_sr1_dist{0.9, 110.0};
-    std::uniform_real_distribution<double> terrain_si0_dist{0.6, 0.95};
-    std::uniform_real_distribution<double> terrain_si1_dist{0.70, 0.99};
-    std::uniform_real_distribution<double> terrain_si2_dist{0.002, 0.004};
+    std::uniform_real_distribution<double> terrain_softness_dist{0.0, 1.1};
+    // 旧6次元独立DR（コメントで残す）
+    // std::uniform_real_distribution<double> terrain_friction_dist{0.8, 1.0};
+    // std::uniform_real_distribution<double> terrain_sr0_dist{0.02, 0.2};
+    // std::uniform_real_distribution<double> terrain_sr1_dist{0.9, 110.0};
+    // std::uniform_real_distribution<double> terrain_si0_dist{0.6, 0.95};
+    // std::uniform_real_distribution<double> terrain_si1_dist{0.70, 0.99};
+    // std::uniform_real_distribution<double> terrain_si2_dist{0.002, 0.004};
+    //入力の数値を当確率となるように分布させる関数
 
     // MuJoCo 足 body ID（ログ・デバッグ用）
     int bid_r_foot = -1;
@@ -119,6 +122,8 @@ private:
     // friction, solref0, solref1, solimp0, solimp1, solimp2
     // 数値6個を直接渡されたとき用の退避先
     double terrain_params[6] = {1.0, 0.1, 2.0, 0.7, 0.85, 0.003};
+    bool terrain_softness_given = false;
+    double terrain_softness_value = 0.0;
 
 private:
     double reward_tracking();
@@ -162,6 +167,7 @@ private:
     void apply_hard_terrain();
     void apply_soft_terrain();
     void apply_debug_terrain();
+    void apply_terrain_softness(double terrain_softness);
     void apply_random_terrain();
     // 歩行途中の切り替え時に、設定された地盤を適用する
     void apply_switch_terrain();
