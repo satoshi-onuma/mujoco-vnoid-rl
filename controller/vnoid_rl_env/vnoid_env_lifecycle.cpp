@@ -149,8 +149,15 @@ VnoidEnv::VnoidEnv(const std::string& model_path, bool enable_rendering)
     prev_com_pos_for_reward = Vector3(0.0, 0.0, 0.0);
     com_vel_actual = Vector3(0.0, 0.0, 0.0);
     first_step = true;
-    
+
+    // terrain_rng はメンバ初期化（デフォルト42）。実験 seed は set_seed() で上書きする。
     std::cout << "✅ VnoidEnv初期化完了" << std::endl;
+}
+
+void VnoidEnv::set_seed(uint32_t seed) {
+    terrain_seed = seed;
+    terrain_rng.seed(seed);
+    std::cout << "地盤乱数シード設定: " << seed << std::endl;
 }
 
 VnoidEnv::~VnoidEnv() {

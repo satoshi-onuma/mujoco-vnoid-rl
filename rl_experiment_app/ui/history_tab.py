@@ -1,14 +1,15 @@
-"""履歴タブ: Treeview一覧 / 評価実行 / 動画再生。"""
+"""履歴タブ: Treeview一覧 / 評価実行 / 動画再生 / 削除。"""
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 import threading
 from pathlib import Path
 
 from tkinter import ttk, messagebox
 
-from ..database import ExperimentDB
+from ..database import DEFAULT_RUNS_ROOT, ExperimentDB
 from ..eval_launcher import EvalLauncher
 
 
@@ -32,7 +33,15 @@ class HistoryTab(ttk.Frame):
         ttk.Button(toolbar, text="更新", command=self.refresh).pack(side="left", padx=2)
         self.eval_button = ttk.Button(toolbar, text="評価を実行", command=self.run_evaluation)
         self.eval_button.pack(side="left", padx=2)
+        ttk.Label(toolbar, text="評価 seed").pack(side="left", padx=(8, 2))
+        self.eval_seed_entry = ttk.Entry(toolbar, width=22)
+        self.eval_seed_entry.pack(side="left", padx=2)
+        ttk.Label(
+            toolbar,
+            text="(空欄=1001-1010 / カンマ区切り)",
+        ).pack(side="left", padx=2)
         ttk.Button(toolbar, text="動画を再生", command=self.play_video).pack(side="left", padx=2)
+        ttk.Button(toolbar, text="削除", command=self.delete_selected).pack(side="left", padx=2)
 
         columns = ("id", "created_at", "terrain", "status", "reward", "distance", "note")
         self.tree = ttk.Treeview(self, columns=columns, show="headings", height=12)
@@ -119,6 +128,26 @@ class HistoryTab(ttk.Frame):
             self.tree.focus(run_id)
         self.detail.config(text=f"メモを保存しました: {run_id}")
 
+    def _parse_eval_seeds(self) -> list[int] | None:
+        """カンマ区切りの評価 seed をパース。空欄は None（launcher 側デフォルト）。"""
+        raw = self.eval_seed_entry.get().strip()
+        if not raw:
+            return None
+        seeds: list[int] = []
+        for part in raw.split(","):
+            part = part.strip()
+            if not part:
+                continue
+            try:
+                seeds.append(int(part))
+            except ValueError as exc:
+                raise ValueError(
+                    f"評価 seed は整数のカンマ区切りで指定してください: '{part}'"
+                ) from exc
+        if not seeds:
+            return None
+        return seeds
+
     def run_evaluation(self):
         ids = self._selected_ids()
         if not ids:
@@ -126,6 +155,12 @@ class HistoryTab(ttk.Frame):
             return
         if len(ids) > 1:
             messagebox.showinfo("評価", "評価は1件ずつ実行してください")
+            return
+
+        try:
+            seeds = self._parse_eval_seeds()
+        except ValueError as exc:
+            messagebox.showerror("評価", str(exc))
             return
 
         run_id = ids[0]
@@ -142,18 +177,19 @@ class HistoryTab(ttk.Frame):
             return
 
         self.eval_button.config(state="disabled")
-        self.detail.config(text=f"評価中: {run_id}")
+        seed_label = ",".join(str(s) for s in seeds) if seeds else "1001-1010"
+        self.detail.config(text=f"評価中: {run_id} (seed={seed_label})")
 
         # 録画・評価は時間がかかるため、tkinterのメインループ外で実行する
         threading.Thread(
             target=self._evaluate_in_background,
-            args=(run_id, run_dir),
+            args=(run_id, run_dir, seeds),
             daemon=True,
         ).start()
 
-    def _evaluate_in_background(self, run_id: str, run_dir: Path):
+    def _evaluate_in_background(self, run_id: str, run_dir: Path, seeds):
         try:
-            results = self.eval_launcher.evaluate_run(run_id, run_dir)
+            results = self.eval_launcher.evaluate_run(run_id, run_dir, seeds=seeds)
             self.after(0, self._evaluation_finished, run_id, results, None)
         except Exception as exc:
             self.after(0, self._evaluation_finished, run_id, None, str(exc))
@@ -198,3 +234,56 @@ class HistoryTab(ttk.Frame):
             self.detail.config(text=f"再生: {video_path}")
         except Exception as e:
             messagebox.showerror("動画", f"再生に失敗しました: {e}")
+
+    @staticmethod
+    def _is_safe_run_dir(run_dir: Path) -> bool:
+        try:
+            resolved = run_dir.resolve()
+            root = DEFAULT_RUNS_ROOT.resolve()
+            return resolved != root and root in resolved.parents
+        except OSError:
+            return False
+
+    def delete_selected(self):
+        ids = self._selected_ids()
+        if not ids:
+            messagebox.showinfo("削除", "削除する実験を選択してください")
+            return
+
+        experiments = []
+        for run_id in ids:
+            exp = self.db.get_experiment(run_id)
+            if not exp:
+                continue
+            if exp.get("status") == "running":
+                messagebox.showwarning(
+                    "削除",
+                    f"学習中の実験は削除できません: {run_id}",
+                )
+                return
+            experiments.append(exp)
+
+        if not experiments:
+            messagebox.showinfo("削除", "削除対象が見つかりません")
+            return
+
+        labels = "\n".join(exp["id"] for exp in experiments)
+        ok = messagebox.askyesno(
+            "削除",
+            f"以下の実験を DB 履歴と run フォルダから削除しますか？\n\n{labels}",
+        )
+        if not ok:
+            return
+
+        deleted = []
+        for exp in experiments:
+            run_id = exp["id"]
+            run_dir = Path(exp["run_dir"]) if exp.get("run_dir") else None
+            self.db.delete_experiment(run_id)
+            if run_dir and self._is_safe_run_dir(run_dir) and run_dir.exists():
+                shutil.rmtree(run_dir, ignore_errors=True)
+            deleted.append(run_id)
+
+        self.refresh()
+        self.note_entry.delete(0, "end")
+        self.detail.config(text=f"削除しました: {', '.join(deleted)}")

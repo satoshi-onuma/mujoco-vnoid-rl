@@ -40,6 +40,7 @@ parser.add_argument("--solimp2", type=float, default=None)
 parser.add_argument("--total-steps", type=int, default=500)
 parser.add_argument("--output-fps", type=int, default=30)
 parser.add_argument("--no-rl-policy", action="store_true", help="学習済み方策を使わずゼロアクションで実行")
+parser.add_argument("--seed", type=int, default=42, help="地盤乱数・環境の再現用シード")
 args = parser.parse_args()
 
 # 設定パラメータ
@@ -61,6 +62,7 @@ if args.terrain_softness is not None:
 else:
     terrain_label = args.terrain or "(C++側デフォルト: soft)"
 print(f"  - 切り替え先地盤: {terrain_label}")
+print(f"  - seed: {args.seed}")
 print("=" * 70)
 
 # チェックポイント確認
@@ -72,14 +74,15 @@ if not os.path.exists(checkpoint_dir):
     print("  python train_humanoid.py")
     exit(1)
 
-# ★ 出力先: --run-dir 指定時は <terrain>_demo.mp4 等、未指定時は従来通り
+# ★ 出力先: --run-dir 指定時は seed{N}_<terrain>_demo.mp4 等、未指定時は従来通り
 if args.run_dir:
     run_dir = Path(args.run_dir).expanduser().resolve()
     run_dir.mkdir(parents=True, exist_ok=True)
+    seed_prefix = f"seed{args.seed}_"
     if args.terrain_softness is not None:
-        prefix = f"softness_{args.terrain_softness:.2f}_"
+        prefix = f"{seed_prefix}softness_{args.terrain_softness:.2f}_"
     else:
-        prefix = f"{args.terrain}_" if args.terrain else ""
+        prefix = f"{seed_prefix}{args.terrain}_" if args.terrain else seed_prefix
     output_path = str(run_dir / f"{prefix}demo.mp4")
     csv_output_path = str(run_dir / f"{prefix}recording_log.csv")
 else:
@@ -126,7 +129,7 @@ if not terrain_config:
     terrain_config = None
 print(f"  - terrain_config: {terrain_config}")
 env = HumanoidVnoidEnv(enable_rendering=True, render_mode="rgb_array", terrain_config=terrain_config)
-obs, info = env.reset(seed=42)
+obs, info = env.reset(seed=args.seed)
 print("✅ 録画環境作成完了")
 
 # フレームバッファ
@@ -257,28 +260,32 @@ if control_log_src.exists():
         if xs:
             walk_distance = math.sqrt((xs[-1] - xs[0]) ** 2 + (ys[-1] - ys[0]) ** 2)
         if args.run_dir:
+            seed_prefix = f"seed{args.seed}_"
             if args.terrain_softness is not None:
-                prefix = f"softness_{args.terrain_softness:.2f}_"
+                prefix = f"{seed_prefix}softness_{args.terrain_softness:.2f}_"
             else:
-                prefix = f"{args.terrain}_" if args.terrain else ""
+                prefix = f"{seed_prefix}{args.terrain}_" if args.terrain else seed_prefix
             import shutil
             shutil.move(str(control_log_src), str(run_dir / f"{prefix}control_log.csv"))
     except Exception as e:
         print(f"⚠️ control_log からの歩行距離算出に失敗: {e}")
 
 # eval_launcher が標準出力からJSONを読む
+_seed_tag = f"seed{args.seed}_"
+_terrain_mode = (
+    f"{_seed_tag}softness_{args.terrain_softness:.2f}"
+    if args.terrain_softness is not None
+    else (f"{_seed_tag}{args.terrain}" if args.terrain else f"{_seed_tag}default")
+)
 print("EVAL_RESULT_JSON:" + json.dumps({
-    "terrain_mode": (
-        f"softness_{args.terrain_softness:.2f}"
-        if args.terrain_softness is not None
-        else (args.terrain or "default")
-    ),
+    "terrain_mode": _terrain_mode,
     "walk_distance": walk_distance,
     "video_path": str(output_path),
     "log_csv_path": str(csv_output_path),
     "checkpoint_dir": checkpoint_dir,
     "total_steps": TOTAL_STEPS,
     "num_frames": len(frames),
+    "seed": args.seed,
 }))
 
 print("\n" + "=" * 70)

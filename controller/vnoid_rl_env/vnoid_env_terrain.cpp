@@ -49,7 +49,10 @@ void VnoidEnv::apply_random_terrain() {
     // double si2 = terrain_si2_dist(terrain_rng);
     // si0 = std::min(si0, si1 - 0.05);
     // apply_terrain(friction, sr0, sr1, si0, si1, si2);
-    apply_terrain_softness(terrain_softness_dist(terrain_rng));
+    const double softness = terrain_softness_dist(terrain_rng);
+    std::cout << "random地盤: terrain_softness=" << softness
+              << " step=" << control_cycle_count << std::endl;
+    apply_terrain_softness(softness);
 }
 
 // Pythonから受け取った地盤設定を保持するだけ。実際の適用は step() の切替タイミング

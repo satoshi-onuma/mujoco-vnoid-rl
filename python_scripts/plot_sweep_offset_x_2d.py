@@ -1,16 +1,11 @@
 """
 sweep CSVから論文向け2Dヒートマップ/折れ線図を生成する。
 
+デフォルトでは --in-csv と同じディレクトリに PNG/PDF を保存する。
+
 使用例:
-  # ヒートマップ
-  python plot_sweep_offset_x_2d.py --in-csv sweep_offset_x.csv --out-prefix figs/pitch_map
-
-  # 折れ線 (固定 posture でスライス)
-  python plot_sweep_offset_x_2d.py --in-csv sweep_offset_x.csv --out-prefix figs/pitch_lines \
-    --plot-mode line --line-axis sink --line-slices -0.1 0.0 0.1
-
-  # 両方
-  python plot_sweep_offset_x_2d.py --in-csv sweep_offset_x.csv --out-prefix figs/pitch \
+  python plot_sweep_offset_x_2d.py \
+    --in-csv ~/vnoid-experiments/sweeps/20260824_182900/sweep_offset_x.csv \
     --plot-mode both
 """
 
@@ -105,7 +100,8 @@ def plot_lines(df: pd.DataFrame, support_foot: str, out_prefix: str,
 def main():
     parser = argparse.ArgumentParser(description="Plot sweep offset_x results (heatmap / line)")
     parser.add_argument("--in-csv", type=str, required=True)
-    parser.add_argument("--out-prefix", type=str, default="sweep_offset_x")
+    parser.add_argument("--out-prefix", type=str, default=None,
+                        help="出力ファイルの接頭辞。未指定時は in-csv と同じディレクトリ")
     parser.add_argument("--plot-mode", type=str, default="both",
                         choices=["heatmap", "line", "both"])
     parser.add_argument("--line-axis", type=str, default="sink",
@@ -116,10 +112,16 @@ def main():
     parser.add_argument("--fontsize", type=int, default=11)
     args = parser.parse_args()
 
-    df = pd.read_csv(args.in_csv)
-    print(f"Loaded {len(df)} rows from {args.in_csv}")
+    in_path = Path(args.in_csv).expanduser().resolve()
+    df = pd.read_csv(in_path)
+    print(f"Loaded {len(df)} rows from {in_path}")
 
-    out_dir = Path(args.out_prefix).parent
+    if args.out_prefix is None:
+        out_prefix = str(in_path.parent / in_path.stem)
+    else:
+        out_prefix = str(Path(args.out_prefix).expanduser())
+
+    out_dir = Path(out_prefix).parent
     out_dir.mkdir(parents=True, exist_ok=True)
 
     # Auto-select line slices if not provided
@@ -135,9 +137,9 @@ def main():
     for foot in feet:
         print(f"\n--- {foot} support ---")
         if args.plot_mode in ('heatmap', 'both'):
-            plot_heatmap(df, foot, args.out_prefix, args.dpi, args.fontsize)
+            plot_heatmap(df, foot, out_prefix, args.dpi, args.fontsize)
         if args.plot_mode in ('line', 'both'):
-            plot_lines(df, foot, args.out_prefix, args.line_axis,
+            plot_lines(df, foot, out_prefix, args.line_axis,
                        args.line_slices, args.dpi, args.fontsize)
 
     print("\nDone.")

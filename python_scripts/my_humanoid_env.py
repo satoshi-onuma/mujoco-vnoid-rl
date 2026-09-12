@@ -140,6 +140,8 @@ class HumanoidVnoidEnv(gym.Env):
     def reset(self, seed=None, options=None):
         super().reset(seed=seed)
         self._step_count = 0  # リセット時にカウンタをゼロに
+        if seed is not None:
+            self.cpp_env.set_seed(int(seed))
         obs = self.cpp_env.reset()
 
         # Phase3: エピソードごとに歩容コマンドをリサンプルしてC++へ注入

@@ -1,20 +1,22 @@
 """
 観測注入sweep: 沈み込み量 × 姿勢 → offset_x の方策応答を収集する。
 
+出力先のデフォルト: ~/vnoid-experiments/sweeps/<sweep_id>/
+
 使用例:
   python sweep_policy_offset_x.py \
-    --checkpoint-dir ./humanoid_vnoid_checkpoint \
-    --template-control-log ./control_log.csv \
+    --checkpoint-dir ~/vnoid-experiments/runs/20260824_162936_16b5ff/checkpoint \
+    --template-control-log ~/vnoid-experiments/runs/20260824_162936_16b5ff/softness_1.00_control_log.csv \
     --posture-metric pitch \
     --sink-min -0.02 --sink-max 0.005 --sink-steps 50 \
-    --posture-min -0.15 --posture-max 0.15 --posture-steps 50 \
-    --out-csv sweep_result.csv
+    --posture-min -0.15 --posture-max 0.15 --posture-steps 50
 """
 
 import argparse
 import csv
 import os
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -34,6 +36,18 @@ IDX_SINK_LEFT = 15
 IDX_CMD_STRIDE = 16
 IDX_CMD_SWAY = 17
 IDX_CMD_TURN = 18
+
+SWEEPS_ROOT = Path.home() / "vnoid-experiments" / "sweeps"
+
+
+def resolve_sweep_dir(sweep_dir: str | None, sweep_id: str | None) -> Path:
+    if sweep_dir:
+        path = Path(sweep_dir).expanduser().resolve()
+    else:
+        sid = sweep_id or datetime.now().strftime("%Y%m%d_%H%M%S")
+        path = SWEEPS_ROOT / sid
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 def load_policy(checkpoint_dir: str):
@@ -191,7 +205,12 @@ def run_sweep(policy, template: np.ndarray, support_foot: str,
 def main():
     parser = argparse.ArgumentParser(description="Policy observation-injection sweep for offset_x")
     parser.add_argument("--checkpoint-dir", type=str, default="./humanoid_vnoid_checkpoint")
-    parser.add_argument("--out-csv", type=str, default="sweep_offset_x.csv")
+    parser.add_argument("--sweep-dir", type=str, default=None,
+                        help="出力ディレクトリ。未指定時は ~/vnoid-experiments/sweeps/<sweep-id>/")
+    parser.add_argument("--sweep-id", type=str, default=None,
+                        help="sweep-dir 未指定時のサブディレクトリ名（デフォルト: タイムスタンプ）")
+    parser.add_argument("--out-csv", type=str, default="sweep_offset_x.csv",
+                        help="CSVファイル名またはパス。sweep-dir からの相対パス可")
     parser.add_argument("--template-control-log", type=str, default="./control_log.csv")
     parser.add_argument("--template-step-threshold", type=int, default=300)
     parser.add_argument("--sink-min", type=float, default=-0.02)
@@ -249,7 +268,10 @@ def main():
         print(f"  {len(rows)} samples collected.")
 
     # Write CSV
-    out_path = Path(args.out_csv)
+    sweep_dir = resolve_sweep_dir(args.sweep_dir, args.sweep_id)
+    out_path = Path(args.out_csv).expanduser()
+    if not out_path.is_absolute():
+        out_path = sweep_dir / out_path
     out_path.parent.mkdir(parents=True, exist_ok=True)
     fieldnames = ['sample_id', 'sink', 'posture_metric', 'posture_value', 'support_foot', 'offset_x']
     with open(out_path, 'w', newline='') as f:
@@ -258,6 +280,7 @@ def main():
         writer.writerows(all_rows)
 
     print(f"\nDone. {len(all_rows)} rows written to: {out_path}")
+    print(f"  sweep dir: {sweep_dir}")
     print(f"  sink range: [{args.sink_min}, {args.sink_max}] ({args.sink_steps} steps)")
     print(f"  posture ({args.posture_metric}): [{args.posture_min}, {args.posture_max}] ({args.posture_steps} steps)")
     print(f"  support feet: {feet}")

@@ -13,6 +13,7 @@
 #include <fstream>
 #include <cmath>
 #include <random>
+#include <cstdint>
 #include <algorithm>
 #include <array>
 #include <string>
@@ -91,11 +92,9 @@ private:
     // 地盤切り替え
     int control_cycle_count = 0;
     int terrain_switch_at = -1;
-    std::mt19937 terrain_rng{std::random_device{}()};
-    //std::random_device{}()をシードとして入れる
-    //terrain_rngはシードから乱数列を作り続けるオブジェクト
-    //高品質な乱数生成器　メルセンヌ・ツイスタ
-    //１から2^32-1までの整数を生成
+    uint32_t terrain_seed = 42;
+    std::mt19937 terrain_rng{42};
+    // terrain_rng は set_seed() で Python 側の seed と同期する
     std::uniform_real_distribution<double> terrain_softness_dist{0.0, 1.1};
     // 旧6次元独立DR（コメントで残す）
     // std::uniform_real_distribution<double> terrain_friction_dist{0.8, 1.0};
@@ -193,6 +192,9 @@ public:
                             double w_healthy_, double tracking_sigma_);
     // 地盤設定を辞書で受け取って保持するだけ。適用は step() 内の切替タイミング
     void set_terrain_config(const py::dict& cfg);
+
+    // Python / RLlib の seed を地盤乱数に反映
+    void set_seed(uint32_t seed);
 
     py::array_t<double> reset();
     // Phase3: 外部から歩容コマンドを注入

@@ -187,6 +187,20 @@ class ExperimentDB:
             ).fetchone()
             return dict(row) if row else None
 
+    def delete_experiment(self, run_id: str) -> bool:
+        """評価結果と実験メタデータを削除する。存在しなければ False。"""
+        with self._connect() as conn:
+            row = conn.execute(
+                "SELECT id FROM experiments WHERE id = ?", (run_id,)
+            ).fetchone()
+            if not row:
+                return False
+            conn.execute(
+                "DELETE FROM evaluations WHERE experiment_id = ?", (run_id,)
+            )
+            conn.execute("DELETE FROM experiments WHERE id = ?", (run_id,))
+            return True
+
     def list_experiments(self, limit: int = 200) -> list[dict]:
         with self._connect() as conn:
             rows = conn.execute(

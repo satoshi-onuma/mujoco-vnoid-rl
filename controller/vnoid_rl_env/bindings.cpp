@@ -11,6 +11,7 @@ PYBIND11_MODULE(vnoid_rl_env, m) {
         .def("set_walk_command", &VnoidEnv::set_walk_command)
         .def("set_reward_weights", &VnoidEnv::set_reward_weights)
         .def("set_terrain_config", &VnoidEnv::set_terrain_config)
+        .def("set_seed", &VnoidEnv::set_seed)
         .def("should_close", &VnoidEnv::should_close)
         .def("get_control_log", &VnoidEnv::get_control_log)
         .def("clear_control_log", &VnoidEnv::clear_control_log);

@@ -31,6 +31,7 @@ class EvalLauncher:
         terrains: Optional[list[str]] = None,
         softness_values: Optional[list[float]] = None,
         total_steps: int = 200,
+        seeds: Optional[list[int]] = None,
     ) -> list[dict]:
         run_dir = Path(run_dir)
         checkpoint_dir = run_dir / "checkpoint"
@@ -41,21 +42,39 @@ class EvalLauncher:
         if terrains is None and softness_values is None:
             softness_values = DEFAULT_EVAL_SOFTNESS
 
+        if not seeds:
+            seeds = list(range(1001, 1011))  # 全モデル共通の評価セット
+
         results = []
-        for terrain in terrains or []:
-            result = self._run_record(
-                run_id, run_dir, checkpoint_dir, total_steps, terrain=terrain
-            )
-            if result:
-                results.append(result)
-        for softness in softness_values or []:
-            result = self._run_record(
-                run_id, run_dir, checkpoint_dir, total_steps,
-                terrain_softness=softness,
-            )
-            if result:
-                results.append(result)
+        for seed in seeds:
+            for terrain in terrains or []:
+                result = self._run_record(
+                    run_id, run_dir, checkpoint_dir, total_steps, terrain=terrain,
+                    seed=seed,
+                )
+                if result:
+                    results.append(result)
+            for softness in softness_values or []:
+                result = self._run_record(
+                    run_id, run_dir, checkpoint_dir, total_steps,
+                    terrain_softness=softness,
+                    seed=seed,
+                )
+                if result:
+                    results.append(result)
         return results
+
+    def _load_run_seed(self, run_dir: Path) -> int:
+        result_path = run_dir / "result.json"
+        if not result_path.exists():
+            return 42
+        try:
+            with open(result_path) as f:
+                payload = json.load(f)
+            hyperparams = payload.get("hyperparams", {})
+            return int(hyperparams.get("seed", payload.get("seed", 42)))
+        except (OSError, ValueError, TypeError, json.JSONDecodeError):
+            return 42
 
     def _run_record(
         self,
@@ -65,11 +84,13 @@ class EvalLauncher:
         total_steps: int,
         terrain: Optional[str] = None,
         terrain_softness: Optional[float] = None,
+        seed: int = 42,
     ) -> Optional[dict]:
         if terrain_softness is not None:
-            label = f"softness_{terrain_softness:.2f}"
+            base_label = f"softness_{terrain_softness:.2f}"
         else:
-            label = terrain or "default"
+            base_label = terrain or "default"
+        label = f"seed{seed}_{base_label}"
 
         argv = [
             sys.executable,
@@ -77,6 +98,7 @@ class EvalLauncher:
             "--checkpoint-dir", str(checkpoint_dir),
             "--run-dir", str(run_dir),
             "--total-steps", str(total_steps),
+            "--seed", str(seed),
         ]
         if terrain_softness is not None:
             argv.extend(["--terrain-softness", str(terrain_softness)])
