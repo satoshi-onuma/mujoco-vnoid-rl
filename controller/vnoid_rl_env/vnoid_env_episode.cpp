@@ -45,6 +45,7 @@ py::array_t<double> VnoidEnv::reset() {
 
     // 地盤切り替えリセット：硬地盤から開始し、ランダムなサイクルで軟地盤に切り替える
     apply_hard_terrain();
+    paper_terrain_switched = false;
     std::uniform_int_distribution<int> dist(200,280);
     //One step takes 0.4s when duration = 0.4
     //Therefore one gait cycle takes 0.8s

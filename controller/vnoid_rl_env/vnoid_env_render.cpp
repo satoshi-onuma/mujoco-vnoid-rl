@@ -75,6 +75,12 @@ void VnoidEnv::updateDisplay() {
     glfwPollEvents();
 }
 
+void VnoidEnv::set_camera(double azimuth, double elevation, double distance) {
+    cam.azimuth = azimuth;
+    cam.elevation = elevation;
+    cam.distance = distance;
+}
+
 // ★★★ 録画用レンダリング（画面表示とは別） ★★★
 py::array_t<unsigned char> VnoidEnv::render() {
     if (!rendering_enabled || !scene_initialized || !context_initialized) {
@@ -92,6 +98,14 @@ py::array_t<unsigned char> VnoidEnv::render() {
         // 録画用の固定ビューポート
         mjrRect viewport = {0, 0, 1280, 720};
         
+        // スポットライトは y=-6 側。左前方カメラだと影になるのでヘッドライトを足す。
+        m->vis.headlight.active = 1;
+        for (int c = 0; c < 3; ++c) {
+            m->vis.headlight.ambient[c] = 0.35f;
+            m->vis.headlight.diffuse[c] = 0.9f;
+            m->vis.headlight.specular[c] = 0.25f;
+        }
+
         // シーン更新・レンダリング
         mjv_updateScene(m, d, &opt, nullptr, &cam, mjCAT_ALL, &scn);
         mjr_render(viewport, &scn, &con);

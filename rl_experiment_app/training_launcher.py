@@ -34,6 +34,7 @@ class TrainingLauncher:
         self.run_dir: Optional[Path] = None
         self.csv_path: Optional[Path] = None
         self.on_complete: Optional[Callable[[str, Path], None]] = None
+        self._finalized = False
 
     def build_argv(self, params: dict, run_id: str, run_dir: Path) -> list[str]:
         argv = [
@@ -65,6 +66,7 @@ class TrainingLauncher:
             raise RuntimeError("既に学習プロセスが実行中です")
 
         ensure_runs_root()
+        self._finalized = False
         self.run_id = run_id or make_run_id()
         if run_dir is None:
             self.run_dir = DEFAULT_RUNS_ROOT / self.run_id
@@ -115,13 +117,19 @@ class TrainingLauncher:
         self._log_file = log_file
         return self.run_id, self.run_dir, self.csv_path
 
+    def is_running(self) -> bool:
+        return self.process is not None and self.process.poll() is None
+
     def poll(self) -> Optional[int]:
-        """プロセスが終了していれば returncode、実行中なら None。"""
+        """実行中なら None。終了直後の一回だけ returncode、その後は None。"""
         if self.process is None:
             return None
         code = self.process.poll()
-        if code is not None:
-            self._finalize(code)
+        if code is None:
+            return None
+        if self._finalized:
+            return None
+        self._finalize(code)
         return code
 
     def stop(self) -> None:
@@ -131,11 +139,17 @@ class TrainingLauncher:
                 self.process.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 self.process.kill()
-            if self.run_id:
-                self.db.update_experiment_status(self.run_id, "early_stopped")
+        if not self._finalized and self.run_id:
+            self.db.update_experiment_status(self.run_id, "early_stopped")
+            self._close_log()
+            self._finalized = True
 
     def _finalize(self, returncode: int) -> None:
+        if self._finalized:
+            return
+        self._finalized = True
         if self.run_id is None or self.run_dir is None:
+            self._close_log()
             return
         result_path = self.run_dir / "result.json"
         if returncode == 0 and result_path.exists():
@@ -154,9 +168,12 @@ class TrainingLauncher:
                 self.on_complete(self.run_id, self.run_dir)
         else:
             self.db.update_experiment_status(self.run_id, "failed")
+        self._close_log()
 
+    def _close_log(self) -> None:
         if hasattr(self, "_log_file") and self._log_file:
             try:
                 self._log_file.close()
             except Exception:
                 pass
+            self._log_file = None

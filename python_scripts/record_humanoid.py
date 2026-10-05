@@ -16,6 +16,12 @@ from pathlib import Path
 from pprint import pprint
 import csv
 
+from eval_intervention import (
+    add_intervention_args,
+    needs_rl_module,
+    resolve_intervention_mode,
+    select_eval_action,
+)
 from my_humanoid_env import HumanoidVnoidEnv
 
 print("=" * 70)
@@ -39,24 +45,20 @@ parser.add_argument("--solimp1", type=float, default=None)
 parser.add_argument("--solimp2", type=float, default=None)
 parser.add_argument("--total-steps", type=int, default=500)
 parser.add_argument("--output-fps", type=int, default=30)
-parser.add_argument("--no-rl-policy", action="store_true", help="学習済み方策を使わずゼロアクションで実行")
+add_intervention_args(parser)
 parser.add_argument("--seed", type=int, default=42, help="地盤乱数・環境の再現用シード")
 args = parser.parse_args()
+INTERVENTION_MODE = resolve_intervention_mode(args.intervention_mode, args.no_rl_policy)
 
 # 設定パラメータ
-# ↓ argparse化前の従来のデフォルト値（引数省略時はこの値のまま動く）
-# OUTPUT_FPS = 30       # 出力動画のFPS
-# TOTAL_STEPS = 500    # 録画するステップ数
-# USE_RL_POLICY = True  # [一時] obs19 vs checkpoint16 不一致。reward検証時はFalse
 OUTPUT_FPS = args.output_fps       # 出力動画のFPS
 TOTAL_STEPS = args.total_steps    # 録画するステップ数
-USE_RL_POLICY = not args.no_rl_policy  # [一時] obs19 vs checkpoint16 不一致。reward検証時はFalse
 
 print("設定:")
 print(f"  - 出力FPS: {OUTPUT_FPS}")
 print("  - 並列環境数: なし（単一環境）")
 print("  - OpenGL: 有効（録画のため）")
-print("  - 推論モード: 学習済みポリシー使用")
+print(f"  - 介入モード: {INTERVENTION_MODE}")
 if args.terrain_softness is not None:
     terrain_label = f"softness_{args.terrain_softness:.2f}"
 else:
@@ -104,14 +106,17 @@ print(f"📦 RLModule パス: {rl_module_path}")
 
 
 # 学習済みアルゴリズムをロード
-print("\n📥 学習済みポリシーをロード中...")
-try:
-    rl_module = RLModule.from_checkpoint(rl_module_path)
-    print("\n📥 RLModuleをロード中...")
-    
-except Exception as e:
-    print(f"❌ ポリシーのロード失敗: {e}")
-    exit(1)
+rl_module = None
+if needs_rl_module(INTERVENTION_MODE):
+    print("\n📥 学習済みポリシーをロード中...")
+    try:
+        rl_module = RLModule.from_checkpoint(rl_module_path)
+        print("\n📥 RLModuleをロード中...")
+    except Exception as e:
+        print(f"❌ ポリシーのロード失敗: {e}")
+        exit(1)
+else:
+    print("\n⏭ 介入なしモードのため RLModule はロードしません")
 
 # 録画用環境を作成（OpenGL有効）
 print("\n🎬 録画環境を作成中...")
@@ -143,43 +148,7 @@ print("-" * 70)
 
 try:
     for i in range(TOTAL_STEPS):
-
-        #if i < 2:
-            #action = np.zeros(2)  # 何もしない
-        #else:
-             # ★ Rayで推論（explore=Falseで決定的行動）
-        if USE_RL_POLICY:
-            obs_batch = torch.tensor(obs, dtype=torch.float32).unsqueeze(0)
-             # 推論（勾配計算不要）
-            with torch.no_grad():
-                model_outputs = rl_module.forward_inference({"obs": obs_batch})
-            
-            action_dist_params = model_outputs["action_dist_inputs"][0].numpy()
-
-            
-        """
-        RL介入あり
-
-        action = np.clip(
-            action_dist_params[:2],  # 0=mean, 1=log(stddev), [0:1]=use mean, but keep shape=(1,)
-            a_min=env.action_space.low,
-            a_max=env.action_space.high,
-        )
-
-            RL介入なし
-            action = np.zeros(2)
-        """
-
-            
-
-        if USE_RL_POLICY:
-            action = np.clip(
-                action_dist_params[:2],  # 0=mean, 1=log(stddev), [0:1]=use mean, but keep shape=(1,)
-                a_min=env.action_space.low,
-                a_max=env.action_space.high,
-            )
-        else:
-            action = np.zeros(2)
+        action = select_eval_action(rl_module, obs, env, INTERVENTION_MODE)
         # ステップ実行
         obs, reward, terminated, truncated, info , step_frames= env.step(action)
 

@@ -54,6 +54,10 @@ VnoidEnv::VnoidEnv(const std::string& model_path, bool enable_rendering)
                      << "zmp_ref_x,zmp_ref_y,"
                      << "dcm_x,dcm_y,dcm_z,"
                      << "dcm_ref_x,dcm_ref_y,dcm_ref_z,"
+                     << "dcm_actual_local_x,dcm_actual_local_y,dcm_actual_local_z,"
+                     << "dcm_ref_local_x,dcm_ref_local_y,dcm_ref_local_z,"
+                     << "dcm_error_local_x,dcm_error_local_y,dcm_error_local_z,"
+                     << "dcm_error_norm,"
                      << "dcm_offset_actual_x,dcm_offset_actual_y,"
                      << "dcm_offset_desired_x,dcm_offset_desired_y,"
                      << "support_foot_actual_x,support_foot_actual_y,"
@@ -165,6 +169,11 @@ VnoidEnv::~VnoidEnv() {
     if (csv_opened) {
         csv_file.close();
         std::cout << "✅ CSVファイル保存完了: control_log.csv" << std::endl;
+    }
+    if (paper_csv_file.is_open()) {
+        paper_csv_file.close();
+        paper_log_enabled = false;
+        std::cout << "✅ paper log 保存完了（デストラクタ）" << std::endl;
     }
 #if VNOID_REWARD_LOG_DEBUG
     if (reward_csv_opened) {

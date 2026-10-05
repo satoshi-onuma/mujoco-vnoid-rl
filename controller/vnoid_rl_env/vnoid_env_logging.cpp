@@ -60,6 +60,81 @@ Vector3 VnoidEnv::calc_dcm_actual(const Vector3& com_vel) {
     // より正確にはFK計算からcom_velを取得すべき
 }
 
+DcmLocalSample VnoidEnv::compute_dcm_local_sample() {
+    DcmLocalSample s;
+    if (!robot) return s;
+
+    s.com_vel = calc_com_velocity();
+    s.dcm_actual = calc_dcm_actual(s.com_vel);
+    s.dcm_ref = robot->centroid.dcm_ref;
+    s.time = robot->timer.time;
+
+    // analyze_dcm_error.py と同じ: 実測は実測ベース、参照は参照ベースへ
+    s.dcm_actual_local =
+        robot->base.ori.conjugate() * (s.dcm_actual - robot->base.pos);
+    s.dcm_ref_local =
+        robot->base.ori_ref.conjugate() * (s.dcm_ref - robot->base.pos_ref);
+    s.dcm_error_local = s.dcm_actual_local - s.dcm_ref_local;
+    s.dcm_error_norm = s.dcm_error_local.norm();
+
+    s.sink_right = robot->foot[0].pos[2] - robot->foot[0].pos_ref[2];
+    s.sink_left = robot->foot[1].pos[2] - robot->foot[1].pos_ref[2];
+    s.contact_right = robot->foot[0].contact_ref ? 1.0 : 0.0;
+    s.contact_left = robot->foot[1].contact_ref ? 1.0 : 0.0;
+    s.delta_x = last_rl_action[0];
+    s.delta_y = last_rl_action[1];
+    s.terrain_switched = paper_terrain_switched ? 1 : 0;
+    return s;
+}
+
+void VnoidEnv::write_paper_row(const DcmLocalSample& s) {
+    if (!paper_log_enabled || !paper_csv_file.is_open()) return;
+    paper_csv_file
+        << s.time << ","
+        << s.terrain_switched << ","
+        << s.dcm_actual_local.x() << "," << s.dcm_actual_local.y() << "," << s.dcm_actual_local.z() << ","
+        << s.dcm_ref_local.x() << "," << s.dcm_ref_local.y() << "," << s.dcm_ref_local.z() << ","
+        << s.dcm_error_local.x() << "," << s.dcm_error_local.y() << "," << s.dcm_error_local.z() << ","
+        << s.dcm_error_norm << ","
+        << s.sink_right << "," << s.sink_left << ","
+        << s.contact_right << "," << s.contact_left << ","
+        << s.delta_x << "," << s.delta_y
+        << std::endl;
+}
+
+void VnoidEnv::start_paper_log(const std::string& path) {
+    if (paper_csv_file.is_open()) {
+        paper_csv_file.close();
+    }
+    paper_csv_file.open(path);
+    if (!paper_csv_file.is_open()) {
+        paper_log_enabled = false;
+        std::cerr << "⚠️ paper log を開けませんでした: " << path << std::endl;
+        return;
+    }
+    paper_log_enabled = true;
+    paper_csv_file
+        << "time,terrain_switched,"
+        << "dcm_actual_local_x,dcm_actual_local_y,dcm_actual_local_z,"
+        << "dcm_ref_local_x,dcm_ref_local_y,dcm_ref_local_z,"
+        << "dcm_error_local_x,dcm_error_local_y,dcm_error_local_z,"
+        << "dcm_error_norm,"
+        << "obs_foot_sink_right,obs_foot_sink_left,"
+        << "obs_contact_right,obs_contact_left,"
+        << "delta_x,delta_y"
+        << std::endl;
+    std::cout << "📝 paper log 開始: " << path << std::endl;
+}
+
+void VnoidEnv::stop_paper_log() {
+    if (paper_csv_file.is_open()) {
+        paper_csv_file.flush();
+        paper_csv_file.close();
+        std::cout << "✅ paper log 保存完了" << std::endl;
+    }
+    paper_log_enabled = false;
+}
+
 // ★ 重心周りの角運動量を計算（MuJoCoから取得）
 Vector3 VnoidEnv::calc_angular_momentum_around_com() {
     if (!m || !d || !robot) {
@@ -102,14 +177,24 @@ Vector3 VnoidEnv::calc_angular_momentum_around_com() {
 }
 
 void VnoidEnv::log_control_data() {
-    if (!rendering_enabled || !robot || !csv_opened || logging_completed) return;
-    
+    if (!robot) return;
 
-    // DCM実測値を計算
-    Vector3 com_vel = calc_com_velocity();
-    Vector3 dcm_actual = calc_dcm_actual(com_vel);
-    
-    double time = robot->timer.time;
+    const bool do_paper = paper_log_enabled && paper_csv_file.is_open();
+    const bool do_full = rendering_enabled && csv_opened && !logging_completed;
+    if (!do_paper && !do_full) return;
+
+    // 共通・軽量起算（CoM速度の副作用もここで一度だけ）
+    DcmLocalSample s = compute_dcm_local_sample();
+    if (do_paper) {
+        write_paper_row(s);
+    }
+    if (!do_full) return;
+
+    Vector3 com_vel = s.com_vel;
+    Vector3 dcm_actual = s.dcm_actual;
+    double time = s.time;
+    double right_foot_sink = s.sink_right;
+    double left_foot_sink = s.sink_left;
     
     // DCM Offset計算
     int sup = robot->footstep_buffer.steps[0].side;
@@ -134,10 +219,6 @@ void VnoidEnv::log_control_data() {
         dcm_offset_desired_x = next_step_dcm_x - next_step_support_foot_x;
         dcm_offset_desired_y = next_step_dcm_y - next_step_support_foot_y;
     }
-    
-    // 観測値
-    double right_foot_sink = robot->foot[0].pos[2] - robot->foot[0].pos_ref[2];
-    double left_foot_sink = robot->foot[1].pos[2] - robot->foot[1].pos_ref[2];
     
     // 回復モーメントの所望量を計算（stabilizer.cppのCalcDcmDynamicsと同じ計算）
     Vector3 theta = robot->base.angle - robot->base.angle_ref;
@@ -202,6 +283,10 @@ void VnoidEnv::log_control_data() {
              << robot->centroid.zmp_ref.x() << "," << robot->centroid.zmp_ref.y() << ","
              << dcm_actual.x() << "," << dcm_actual.y() << "," << dcm_actual.z() << ","
              << robot->centroid.dcm_ref.x() << "," << robot->centroid.dcm_ref.y() << "," << robot->centroid.dcm_ref.z() << ","
+             << s.dcm_actual_local.x() << "," << s.dcm_actual_local.y() << "," << s.dcm_actual_local.z() << ","
+             << s.dcm_ref_local.x() << "," << s.dcm_ref_local.y() << "," << s.dcm_ref_local.z() << ","
+             << s.dcm_error_local.x() << "," << s.dcm_error_local.y() << "," << s.dcm_error_local.z() << ","
+             << s.dcm_error_norm << ","
              << dcm_offset_actual_x << "," << dcm_offset_actual_y << ","
              << dcm_offset_desired_x << "," << dcm_offset_desired_y << ","
              << support_foot_actual_x << "," << support_foot_actual_y << ","

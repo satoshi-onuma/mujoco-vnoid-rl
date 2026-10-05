@@ -14,5 +14,10 @@ PYBIND11_MODULE(vnoid_rl_env, m) {
         .def("set_seed", &VnoidEnv::set_seed)
         .def("should_close", &VnoidEnv::should_close)
         .def("get_control_log", &VnoidEnv::get_control_log)
-        .def("clear_control_log", &VnoidEnv::clear_control_log);
+        .def("clear_control_log", &VnoidEnv::clear_control_log)
+        .def("start_paper_log", &VnoidEnv::start_paper_log)
+        .def("stop_paper_log", &VnoidEnv::stop_paper_log)
+        .def("get_terrain_switch_at", &VnoidEnv::get_terrain_switch_at)
+        .def("is_terrain_switched", &VnoidEnv::is_terrain_switched)
+        .def("set_camera", &VnoidEnv::set_camera);
 }

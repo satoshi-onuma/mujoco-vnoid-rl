@@ -84,6 +84,7 @@ void VnoidEnv::set_terrain_config(const py::dict& cfg) {
 }
 
 void VnoidEnv::apply_switch_terrain() {
+    paper_terrain_switched = true;
     if (terrain_params_given) {
         apply_terrain(terrain_params[0], terrain_params[1], terrain_params[2],
                       terrain_params[3], terrain_params[4], terrain_params[5]);

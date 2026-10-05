@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Softness × seed 格子評価: 50歩転倒なしの成功率だけを集計する。"""
+"""Softness × seed 格子評価 + 論文用スリム制御ログ（headless）。
+
+eval_softness_grid.py と同型の CLI / results・summary に加え、
+各 trial の control.csv（ベース相対DCM誤差・sink・Δ・切替フラグ）を書く。
+"""
 
 from __future__ import annotations
 
@@ -41,7 +45,6 @@ def parse_seeds(raw: str) -> list[int]:
 def softness_values(min_v: float, max_v: float, step: float) -> list[float]:
     if step <= 0:
         raise ValueError("softness-step は正の値である必要があります")
-    # 浮動小数の累積誤差を避けるため整数インデックスで生成
     n = int(round((max_v - min_v) / step)) + 1
     values = [round(min_v + i * step, 10) for i in range(n)]
     values = [v for v in values if v <= max_v + 1e-12]
@@ -51,7 +54,6 @@ def softness_values(min_v: float, max_v: float, step: float) -> list[float]:
 
 
 def resolve_checkpoint_dir(path: Path) -> Path:
-    """RLModule が載っている checkpoint ルートを解決する。"""
     path = path.expanduser().resolve()
     candidates = [path]
     nested = path / "checkpoint"
@@ -69,7 +71,6 @@ def resolve_checkpoint_dir(path: Path) -> Path:
 
 
 def checkpoint_label(checkpoint_dir: Path) -> str:
-    """出力ディレクトリ名用のチェックポイント識別子。"""
     name = checkpoint_dir.name
     if name == "checkpoint" and checkpoint_dir.parent.name:
         return checkpoint_dir.parent.name
@@ -83,13 +84,14 @@ def default_output_dir(
     softness_step: float,
     intervention_mode: str = "full",
 ) -> Path:
-    """~/vnoid-experiments/evals/<checkpoint>_s<min>-<max>_step<step>_interv-<mode>/"""
     label = checkpoint_label(checkpoint_dir)
-    soft_tag = (
-        f"s{softness_min:.2f}-{softness_max:.2f}_step{softness_step:.2f}"
-    )
+    soft_tag = f"s{softness_min:.2f}-{softness_max:.2f}_step{softness_step:.2f}"
     tag = intervention_dir_tag(intervention_mode)
-    return DEFAULT_EXPERIMENTS_ROOT / "evals" / f"{label}_{soft_tag}_{tag}"
+    return DEFAULT_EXPERIMENTS_ROOT / "paper_logs" / f"{label}_{soft_tag}_{tag}"
+
+
+def trial_dirname(seed: int, softness: float) -> str:
+    return f"seed{seed}_softness_{softness:.2f}"
 
 
 def run_episode(
@@ -97,28 +99,39 @@ def run_episode(
     rl_module: RLModule | None,
     seed: int,
     softness: float,
+    control_csv: Path,
     intervention_mode: str,
-) -> tuple[int, int]:
-    """1エピソード実行。戻り値: (success 0/1, steps)。"""
+) -> tuple[int, int, int]:
+    """1エピソード。戻り値: (success, steps, switch_at)。"""
     env.cpp_env.set_terrain_config(
         {"mode": "terrain_softness", "terrain_softness": float(softness)}
     )
-    obs, _info = env.reset(seed=seed)
-    steps = 0
-    max_steps = env.max_episode_steps
-    for _ in range(max_steps):
-        action = select_eval_action(rl_module, obs, env, intervention_mode)
-        step_out = env.step(action)
-        # enable_rendering=False なら 5-tuple
-        obs, _reward, terminated, truncated, _info = step_out[:5]
-        steps += 1
-        if terminated or truncated:
-            success = int(bool(truncated) and not bool(terminated))
-            return success, steps
-    return 0, steps
+    # 契約: start_paper_log → reset → run → stop_paper_log
+    control_csv.parent.mkdir(parents=True, exist_ok=True)
+    env.cpp_env.start_paper_log(str(control_csv))
+    try:
+        obs, _info = env.reset(seed=seed)
+        switch_at = int(env.cpp_env.get_terrain_switch_at())
+        steps = 0
+        max_steps = env.max_episode_steps
+        for _ in range(max_steps):
+            action = select_eval_action(rl_module, obs, env, intervention_mode)
+            step_out = env.step(action)
+            obs, _reward, terminated, truncated, _info = step_out[:5]
+            steps += 1
+            if terminated or truncated:
+                success = int(bool(truncated) and not bool(terminated))
+                return success, steps, switch_at
+        return 0, steps, switch_at
+    finally:
+        env.cpp_env.stop_paper_log()
 
 
-def print_matrix(seeds: list[int], softs: list[float], results: dict[tuple[int, float], tuple[int, int]]) -> None:
+def print_matrix(
+    seeds: list[int],
+    softs: list[float],
+    results: dict[tuple[int, float], tuple[int, int, int]],
+) -> None:
     soft_headers = [f"{s:.2f}" for s in softs]
     col_w = max(6, max(len(h) for h in soft_headers))
     seed_w = max(4, max(len(str(s)) for s in seeds))
@@ -131,7 +144,7 @@ def print_matrix(seeds: list[int], softs: list[float], results: dict[tuple[int, 
         cells = []
         ok = 0
         for soft in softs:
-            success, _ = results[(seed, soft)]
+            success, _, _ = results[(seed, soft)]
             cells.append(f"{success:>{col_w}}")
             ok += success
         rate = ok / len(softs)
@@ -156,27 +169,37 @@ def write_outputs(
     checkpoint_dir: Path,
     seeds: list[int],
     softs: list[float],
-    results: dict[tuple[int, float], tuple[int, int]],
+    results: dict[tuple[int, float], tuple[int, int, int]],
     intervention_mode: str,
 ) -> None:
     output_dir.mkdir(parents=True, exist_ok=True)
 
+    fieldnames = [
+        "seed",
+        "softness",
+        "success",
+        "steps",
+        "switch_at",
+        "checkpoint_dir",
+        "trial_dir",
+    ]
     results_path = output_dir / "results.csv"
     with results_path.open("w", newline="") as f:
-        writer = csv.DictWriter(
-            f, fieldnames=["seed", "softness", "success", "steps", "checkpoint_dir"]
-        )
+        writer = csv.DictWriter(f, fieldnames=fieldnames)
         writer.writeheader()
         for seed in seeds:
             for soft in softs:
-                success, steps = results[(seed, soft)]
+                success, steps, switch_at = results[(seed, soft)]
+                trial = trial_dirname(seed, soft)
                 writer.writerow(
                     {
                         "seed": seed,
                         "softness": f"{soft:.2f}",
                         "success": success,
                         "steps": steps,
+                        "switch_at": switch_at,
                         "checkpoint_dir": str(checkpoint_dir),
+                        "trial_dir": trial,
                     }
                 )
 
@@ -228,8 +251,30 @@ def write_outputs(
     )
 
 
+def write_trial_meta(
+    trial_dir: Path,
+    seed: int,
+    softness: float,
+    success: int,
+    steps: int,
+    switch_at: int,
+) -> None:
+    (trial_dir / "meta.txt").write_text(
+        "\n".join(
+            [
+                f"seed={seed}",
+                f"softness={softness:.2f}",
+                f"success={success}",
+                f"steps={steps}",
+                f"switch_at={switch_at}",
+            ]
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+
+
 def main() -> int:
-    # C++ 側の即座 flush と順序がずれないようにする
     if hasattr(sys.stdout, "reconfigure"):
         try:
             sys.stdout.reconfigure(line_buffering=True)
@@ -237,7 +282,7 @@ def main() -> int:
             pass
 
     parser = argparse.ArgumentParser(
-        description="Softness × seed 格子で50歩生存成功率を評価する"
+        description="Softness × seed 格子 + 論文用スリム制御ログ"
     )
     parser.add_argument(
         "--checkpoint-dir",
@@ -258,7 +303,7 @@ def main() -> int:
         "--output-dir",
         type=str,
         default=None,
-        help="未指定時は ~/vnoid-experiments/evals/<checkpoint名>_s..._interv-<mode>/",
+        help="未指定時は ~/vnoid-experiments/paper_logs/<checkpoint>_s..._interv-<mode>/",
     )
     add_intervention_args(parser)
     args = parser.parse_args()
@@ -288,7 +333,7 @@ def main() -> int:
 
     rl_module_path = checkpoint_dir / RL_MODULE_SUFFIX
     print("=" * 70)
-    print("Softness 格子成功率評価")
+    print("Softness 格子 + 論文用 paper log")
     print("=" * 70)
     print(f"checkpoint: {checkpoint_dir}")
     print(f"RLModule:   {rl_module_path}")
@@ -309,26 +354,36 @@ def main() -> int:
             return 1
         print("✅ ロード完了")
 
-    print("🎬 評価環境を作成中（描画なし）...")
+    print("🎬 評価環境を作成中（描画なし + paper log）...")
     env = HumanoidVnoidEnv(
         enable_rendering=False,
         terrain_config={"mode": "terrain_softness", "terrain_softness": softs[0]},
     )
 
-    results: dict[tuple[int, float], tuple[int, int]] = {}
+    results: dict[tuple[int, float], tuple[int, int, int]] = {}
     total = len(seeds) * len(softs)
     idx = 0
     try:
         for seed in seeds:
             for soft in softs:
                 idx += 1
-                success, steps = run_episode(
-                    env, rl_module, seed, soft, intervention_mode
+                trial_dir = output_dir / trial_dirname(seed, soft)
+                control_csv = trial_dir / "control.csv"
+                success, steps, switch_at = run_episode(
+                    env,
+                    rl_module,
+                    seed,
+                    soft,
+                    control_csv,
+                    intervention_mode,
                 )
-                results[(seed, soft)] = (success, steps)
+                results[(seed, soft)] = (success, steps, switch_at)
+                write_trial_meta(
+                    trial_dir, seed, soft, success, steps, switch_at
+                )
                 print(
                     f"[{idx}/{total}] seed={seed} softness={soft:.2f} "
-                    f"success={success} steps={steps}"
+                    f"success={success} steps={steps} switch_at={switch_at}"
                 )
     finally:
         env.close()
@@ -341,6 +396,7 @@ def main() -> int:
     print(f"\nCSV: {output_dir / 'results.csv'}")
     print(f"summary: {output_dir / 'summary.csv'}")
     print(f"meta: {output_dir / 'meta.txt'}")
+    print(f"trials: {output_dir}/seed*_softness_*/control.csv")
     print("✅ 完了")
     return 0
 

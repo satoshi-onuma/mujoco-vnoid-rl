@@ -11,7 +11,7 @@ print("🔍 Vnoid Humanoid ニューラルネットワーク設定確認")
 print("=" * 70)
 
 # チェックポイント確認
-checkpoint_dir = os.path.abspath("./humanoid_vnoid_checkpoint_id3")
+checkpoint_dir = os.path.abspath("./checkpoint")
 if not os.path.exists(checkpoint_dir):
     print(f"\n❌ エラー: チェックポイントが見つかりません")
     print(f"パス: {checkpoint_dir}")

@@ -1,16 +1,38 @@
-"""履歴タブ: Treeview一覧 / 評価実行 / 動画再生 / 削除。"""
+"""履歴タブ: Treeview一覧 / softness評価キュー投入 / 削除。"""
 
 from __future__ import annotations
 
 import shutil
-import subprocess
-import threading
 from pathlib import Path
+from typing import Callable
 
+import tkinter as tk
 from tkinter import ttk, messagebox
 
 from ..database import DEFAULT_RUNS_ROOT, ExperimentDB
-from ..eval_launcher import EvalLauncher
+from ..paper_eval_link import list_paper_links_for_experiments
+
+
+def parse_seeds_text(raw: str) -> str:
+    """UI入力を検証し、CLI に渡す文字列を返す（空なら既定）。"""
+    raw = raw.strip()
+    if not raw:
+        return "1001-1010"
+    if "-" in raw and "," not in raw:
+        left, right = raw.split("-", 1)
+        start, end = int(left), int(right)
+        if end < start:
+            raise ValueError(f"seed 範囲が不正です: {raw}")
+        return f"{start}-{end}"
+    seeds: list[int] = []
+    for part in raw.split(","):
+        part = part.strip()
+        if not part:
+            continue
+        seeds.append(int(part))
+    if not seeds:
+        raise ValueError("seed が空です")
+    return ",".join(str(s) for s in seeds)
 
 
 class HistoryTab(ttk.Frame):
@@ -18,12 +40,12 @@ class HistoryTab(ttk.Frame):
         self,
         master,
         db: ExperimentDB,
-        eval_launcher: EvalLauncher,
+        on_enqueue_eval: Callable[[dict], None],
         **kwargs,
     ):
         super().__init__(master, **kwargs)
         self.db = db
-        self.eval_launcher = eval_launcher
+        self.on_enqueue_eval = on_enqueue_eval
         self._build()
         self.refresh()
 
@@ -31,36 +53,96 @@ class HistoryTab(ttk.Frame):
         toolbar = ttk.Frame(self)
         toolbar.pack(fill="x", padx=8, pady=4)
         ttk.Button(toolbar, text="更新", command=self.refresh).pack(side="left", padx=2)
-        self.eval_button = ttk.Button(toolbar, text="評価を実行", command=self.run_evaluation)
-        self.eval_button.pack(side="left", padx=2)
-        ttk.Label(toolbar, text="評価 seed").pack(side="left", padx=(8, 2))
-        self.eval_seed_entry = ttk.Entry(toolbar, width=22)
-        self.eval_seed_entry.pack(side="left", padx=2)
-        ttk.Label(
-            toolbar,
-            text="(空欄=1001-1010 / カンマ区切り)",
-        ).pack(side="left", padx=2)
-        ttk.Button(toolbar, text="動画を再生", command=self.play_video).pack(side="left", padx=2)
         ttk.Button(toolbar, text="削除", command=self.delete_selected).pack(side="left", padx=2)
 
-        columns = ("id", "created_at", "terrain", "status", "reward", "distance", "note")
+        eval_frame = ttk.LabelFrame(self, text="Softness 評価（キューへ）")
+        eval_frame.pack(fill="x", padx=8, pady=4)
+
+        row1 = ttk.Frame(eval_frame)
+        row1.pack(fill="x", padx=4, pady=2)
+        ttk.Label(row1, text="seeds").pack(side="left")
+        self.eval_seed_entry = ttk.Entry(row1, width=18)
+        self.eval_seed_entry.insert(0, "1001-1010")
+        self.eval_seed_entry.pack(side="left", padx=4)
+        ttk.Label(row1, text="(1001-1010 またはカンマ区切り)").pack(side="left")
+
+        ttk.Label(row1, text="script").pack(side="left", padx=(12, 2))
+        self.script_var = tk.StringVar(value="grid")
+        ttk.Combobox(
+            row1,
+            textvariable=self.script_var,
+            values=["grid", "paper_log"],
+            width=10,
+            state="readonly",
+        ).pack(side="left", padx=2)
+        ttk.Label(
+            row1,
+            text="paper_log は control.csv が増え容量注意",
+        ).pack(side="left", padx=4)
+
+        ttk.Label(row1, text="interv").pack(side="left", padx=(12, 2))
+        self.interv_var = tk.StringVar(value="full")
+        ttk.Combobox(
+            row1,
+            textvariable=self.interv_var,
+            values=["none", "full", "after_switch"],
+            width=12,
+            state="readonly",
+        ).pack(side="left", padx=2)
+
+        row2 = ttk.Frame(eval_frame)
+        row2.pack(fill="x", padx=4, pady=2)
+        ttk.Label(row2, text="softness min").pack(side="left")
+        self.soft_min_entry = ttk.Entry(row2, width=8)
+        self.soft_min_entry.insert(0, "0.0")
+        self.soft_min_entry.pack(side="left", padx=4)
+        ttk.Label(row2, text="max").pack(side="left")
+        self.soft_max_entry = ttk.Entry(row2, width=8)
+        self.soft_max_entry.insert(0, "1.2")
+        self.soft_max_entry.pack(side="left", padx=4)
+        ttk.Label(row2, text="step").pack(side="left")
+        self.soft_step_entry = ttk.Entry(row2, width=8)
+        self.soft_step_entry.insert(0, "0.1")
+        self.soft_step_entry.pack(side="left", padx=4)
+        ttk.Button(
+            row2, text="評価をキューへ", command=self.enqueue_evaluation
+        ).pack(side="left", padx=8)
+
+        columns = (
+            "id",
+            "created_at",
+            "terrain",
+            "status",
+            "paper",
+            "reward",
+            "distance",
+            "note",
+        )
         self.tree = ttk.Treeview(self, columns=columns, show="headings", height=12)
         headings = {
             "id": "Run ID",
             "created_at": "日時",
             "terrain": "地盤",
             "status": "状態",
+            "paper": "paper_log",
             "reward": "最終Reward",
             "distance": "歩行距離",
             "note": "メモ",
         }
-        widths = {"id": 180, "created_at": 140, "terrain": 60, "status": 90,
-                  "reward": 90, "distance": 80, "note": 200}
+        widths = {
+            "id": 160,
+            "created_at": 130,
+            "terrain": 56,
+            "status": 80,
+            "paper": 64,
+            "reward": 80,
+            "distance": 72,
+            "note": 160,
+        }
         for col in columns:
             self.tree.heading(col, text=headings[col])
             self.tree.column(col, width=widths[col], anchor="w")
         self.tree.pack(fill="both", expand=True, padx=8, pady=4)
-        self.tree.bind("<Double-1>", lambda e: self.play_video())
         self.tree.bind("<<TreeviewSelect>>", self._on_select)
 
         note_frame = ttk.Frame(self)
@@ -68,18 +150,32 @@ class HistoryTab(ttk.Frame):
         ttk.Label(note_frame, text="メモ").pack(side="left")
         self.note_entry = ttk.Entry(note_frame)
         self.note_entry.pack(side="left", fill="x", expand=True, padx=4)
-        ttk.Button(note_frame, text="メモ保存", command=self.save_note).pack(side="left", padx=2)
+        ttk.Button(note_frame, text="メモ保存", command=self.save_note).pack(
+            side="left", padx=2
+        )
 
         self.detail = ttk.Label(self, text="", wraplength=700, justify="left")
-        self.detail.pack(anchor="w", padx=8, pady=4)
+        self.detail.pack(anchor="w", padx=8, pady=2)
+        self.eval_status = ttk.Label(self, text="eval: idle", wraplength=700)
+        self.eval_status.pack(anchor="w", padx=8, pady=2)
+
+    def set_eval_status(self, text: str):
+        self.eval_status.config(text=text)
 
     def refresh(self):
         for item in self.tree.get_children():
             self.tree.delete(item)
         rows = self.db.list_experiments()
+        ids = [row["id"] for row in rows]
+        paper_by_id = {
+            link.experiment_id: link.status
+            for link in list_paper_links_for_experiments(self.db, ids)
+        }
+        paper_label = {"ready": "あり", "partial": "partial", "no_paper": "—"}
         for row in rows:
             reward = row.get("final_reward_mean")
             distance = row.get("walk_distance")
+            pl = paper_label.get(paper_by_id.get(row["id"], "no_paper"), "—")
             self.tree.insert(
                 "",
                 "end",
@@ -89,6 +185,7 @@ class HistoryTab(ttk.Frame):
                     row.get("created_at", ""),
                     row.get("terrain_mode", ""),
                     row.get("status", ""),
+                    pl,
                     f"{reward:.3f}" if reward is not None else "",
                     f"{distance:.3f}" if distance is not None else "",
                     row.get("note") or "",
@@ -108,7 +205,13 @@ class HistoryTab(ttk.Frame):
         note = experiment.get("note") or ""
         self.note_entry.delete(0, "end")
         self.note_entry.insert(0, note)
-        self.detail.config(text=f"選択中: {ids[0]}")
+        from ..paper_eval_link import resolve_paper_dir
+
+        paper_dir, source, _ = resolve_paper_dir(ids[0], self.db)
+        extra = ""
+        if paper_dir is not None:
+            extra = f"\npaper_log ({source}): {paper_dir.name}"
+        self.detail.config(text=f"選択中: {', '.join(ids)}{extra}")
 
     def save_note(self):
         ids = self._selected_ids()
@@ -122,118 +225,75 @@ class HistoryTab(ttk.Frame):
         note = self.note_entry.get().strip()
         self.db.update_experiment_note(run_id, note)
         self.refresh()
-        # 選択が外れるので戻す
         if self.tree.exists(run_id):
             self.tree.selection_set(run_id)
             self.tree.focus(run_id)
         self.detail.config(text=f"メモを保存しました: {run_id}")
 
-    def _parse_eval_seeds(self) -> list[int] | None:
-        """カンマ区切りの評価 seed をパース。空欄は None（launcher 側デフォルト）。"""
-        raw = self.eval_seed_entry.get().strip()
-        if not raw:
-            return None
-        seeds: list[int] = []
-        for part in raw.split(","):
-            part = part.strip()
-            if not part:
-                continue
-            try:
-                seeds.append(int(part))
-            except ValueError as exc:
-                raise ValueError(
-                    f"評価 seed は整数のカンマ区切りで指定してください: '{part}'"
-                ) from exc
-        if not seeds:
-            return None
-        return seeds
-
-    def run_evaluation(self):
+    def enqueue_evaluation(self):
         ids = self._selected_ids()
         if not ids:
             messagebox.showinfo("評価", "評価する実験を選択してください")
             return
-        if len(ids) > 1:
-            messagebox.showinfo("評価", "評価は1件ずつ実行してください")
-            return
 
         try:
-            seeds = self._parse_eval_seeds()
+            seeds = parse_seeds_text(self.eval_seed_entry.get())
+            soft_min = float(self.soft_min_entry.get())
+            soft_max = float(self.soft_max_entry.get())
+            soft_step = float(self.soft_step_entry.get())
         except ValueError as exc:
-            messagebox.showerror("評価", str(exc))
+            messagebox.showerror("評価", f"パラメータが不正です: {exc}")
+            return
+        if soft_step <= 0:
+            messagebox.showerror("評価", "softness step は正の値にしてください")
+            return
+        if soft_max < soft_min:
+            messagebox.showerror("評価", "softness max は min 以上にしてください")
             return
 
-        run_id = ids[0]
-        experiment = self.db.get_experiment(run_id)
-        if not experiment:
-            messagebox.showerror("評価", f"実験情報が見つかりません: {run_id}")
-            return
+        script = self.script_var.get()
+        intervention_mode = self.interv_var.get()
+        queued = []
+        skipped = []
+        for run_id in ids:
+            experiment = self.db.get_experiment(run_id)
+            if not experiment:
+                skipped.append(f"{run_id} (DBなし)")
+                continue
+            run_dir = Path(experiment["run_dir"])
+            checkpoint_dir = run_dir / "checkpoint"
+            if experiment.get("status") not in ("completed", "early_stopped"):
+                skipped.append(f"{run_id} (status={experiment.get('status')})")
+                continue
+            if not checkpoint_dir.exists():
+                skipped.append(f"{run_id} (checkpointなし)")
+                continue
+            item = {
+                "run_id": run_id,
+                "checkpoint_dir": str(checkpoint_dir),
+                "seeds": seeds,
+                "softness_min": soft_min,
+                "softness_max": soft_max,
+                "softness_step": soft_step,
+                "script": script,
+                "intervention_mode": intervention_mode,
+                "label": (
+                    f"eval {run_id} [{script}] interv={intervention_mode} "
+                    f"s={soft_min:.2f}-{soft_max:.2f}/{soft_step:.2f}"
+                ),
+            }
+            self.on_enqueue_eval(item)
+            queued.append(run_id)
 
-        run_dir = Path(experiment["run_dir"])
-        checkpoint_dir = run_dir / "checkpoint"
-        # Stopで途中終了した実験でも、途中保存されたcheckpointがあれば評価を許可する
-        if experiment.get("status") not in ("completed", "early_stopped") or not checkpoint_dir.exists():
-            messagebox.showwarning("評価", "評価可能なチェックポイントがありません")
-            return
-
-        self.eval_button.config(state="disabled")
-        seed_label = ",".join(str(s) for s in seeds) if seeds else "1001-1010"
-        self.detail.config(text=f"評価中: {run_id} (seed={seed_label})")
-
-        # 録画・評価は時間がかかるため、tkinterのメインループ外で実行する
-        threading.Thread(
-            target=self._evaluate_in_background,
-            args=(run_id, run_dir, seeds),
-            daemon=True,
-        ).start()
-
-    def _evaluate_in_background(self, run_id: str, run_dir: Path, seeds):
-        try:
-            results = self.eval_launcher.evaluate_run(run_id, run_dir, seeds=seeds)
-            self.after(0, self._evaluation_finished, run_id, results, None)
-        except Exception as exc:
-            self.after(0, self._evaluation_finished, run_id, None, str(exc))
-
-    def _evaluation_finished(self, run_id: str, results, error):
-        self.eval_button.config(state="normal")
-        if error:
-            self.detail.config(text=f"評価失敗: {run_id}")
-            messagebox.showerror("評価", error)
-            return
-
-        self.refresh()
-        self.detail.config(text=f"評価完了: {run_id} ({len(results)} 地盤)")
-
-    def play_video(self):
-        ids = self._selected_ids()
-        if not ids:
-            messagebox.showinfo("動画", "実験を選択してください")
-            return
-        run_id = ids[0]
-        evals = self.db.list_evaluations(run_id)
-        video_path = None
-        if evals:
-            for ev in evals:
-                if ev.get("video_path") and Path(ev["video_path"]).exists():
-                    video_path = ev["video_path"]
-                    break
-        if video_path is None:
-            exp = self.db.get_experiment(run_id)
-            if exp and exp.get("run_dir"):
-                run_dir = Path(exp["run_dir"])
-                for candidate in sorted(run_dir.glob("*_demo.mp4")):
-                    video_path = str(candidate)
-                    break
-
-        if not video_path or not Path(video_path).exists():
-            messagebox.showwarning("動画", f"動画ファイルが見つかりません: {run_id}")
-            return
-
-        try:
-            subprocess.Popen(["xdg-open", video_path])
-            self.detail.config(text=f"再生: {video_path}")
-        except Exception as e:
-            messagebox.showerror("動画", f"再生に失敗しました: {e}")
+        if queued:
+            self.detail.config(text=f"評価キューへ追加: {', '.join(queued)}")
+        if skipped:
+            messagebox.showwarning(
+                "評価",
+                "スキップしました:\n" + "\n".join(skipped),
+            )
+        if not queued and not skipped:
+            messagebox.showinfo("評価", "追加できる実験がありません")
 
     @staticmethod
     def _is_safe_run_dir(run_dir: Path) -> bool:

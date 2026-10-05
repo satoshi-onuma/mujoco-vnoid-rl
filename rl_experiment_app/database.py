@@ -66,6 +66,22 @@ class ExperimentDB:
                     created_at TEXT NOT NULL,
                     FOREIGN KEY(experiment_id) REFERENCES experiments(id)
                 );
+
+                CREATE TABLE IF NOT EXISTS softness_eval_runs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    experiment_id TEXT NOT NULL,
+                    script TEXT NOT NULL,
+                    output_dir TEXT NOT NULL,
+                    seeds TEXT NOT NULL,
+                    softness_min REAL NOT NULL,
+                    softness_max REAL NOT NULL,
+                    softness_step REAL NOT NULL,
+                    intervention_mode TEXT NOT NULL,
+                    finished_at TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    FOREIGN KEY(experiment_id) REFERENCES experiments(id),
+                    UNIQUE(experiment_id, output_dir)
+                );
                 """
             )
             # 既存DB向け: note 列が無ければ追加
@@ -198,6 +214,10 @@ class ExperimentDB:
             conn.execute(
                 "DELETE FROM evaluations WHERE experiment_id = ?", (run_id,)
             )
+            conn.execute(
+                "DELETE FROM softness_eval_runs WHERE experiment_id = ?",
+                (run_id,),
+            )
             conn.execute("DELETE FROM experiments WHERE id = ?", (run_id,))
             return True
 
@@ -227,4 +247,66 @@ class ExperimentDB:
                 """,
                 (experiment_id,),
             ).fetchall()
+            return [dict(r) for r in rows]
+
+    def upsert_softness_eval_run(
+        self,
+        experiment_id: str,
+        script: str,
+        output_dir: str,
+        seeds: str,
+        softness_min: float,
+        softness_max: float,
+        softness_step: float,
+        intervention_mode: str,
+        status: str,
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                INSERT INTO softness_eval_runs (
+                    experiment_id, script, output_dir, seeds,
+                    softness_min, softness_max, softness_step,
+                    intervention_mode, finished_at, status
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(experiment_id, output_dir) DO UPDATE SET
+                    script = excluded.script,
+                    seeds = excluded.seeds,
+                    softness_min = excluded.softness_min,
+                    softness_max = excluded.softness_max,
+                    softness_step = excluded.softness_step,
+                    intervention_mode = excluded.intervention_mode,
+                    finished_at = excluded.finished_at,
+                    status = excluded.status
+                """,
+                (
+                    experiment_id,
+                    script,
+                    output_dir,
+                    seeds,
+                    softness_min,
+                    softness_max,
+                    softness_step,
+                    intervention_mode,
+                    datetime.now().isoformat(timespec="seconds"),
+                    status,
+                ),
+            )
+
+    def list_softness_eval_runs(
+        self,
+        experiment_id: str | None = None,
+        script: str | None = None,
+    ) -> list[dict]:
+        query = "SELECT * FROM softness_eval_runs WHERE 1=1"
+        params: list[Any] = []
+        if experiment_id is not None:
+            query += " AND experiment_id = ?"
+            params.append(experiment_id)
+        if script is not None:
+            query += " AND script = ?"
+            params.append(script)
+        query += " ORDER BY finished_at DESC"
+        with self._connect() as conn:
+            rows = conn.execute(query, params).fetchall()
             return [dict(r) for r in rows]
